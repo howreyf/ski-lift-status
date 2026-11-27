@@ -1,0 +1,126 @@
+# List of resorts the scraper visits.
+#
+#   id        short, permanent key used in docs/data/lifts.json (never change it once data exists)
+#   name      display name on the website
+#   region    used to group resorts on the website
+#   url       the lift status page
+#   parser    file in scraper/parsers/ that reads the page (without .py)
+#   data_url  (optional) where the data is actually downloaded from, when the page loads it
+#             from a separate feed; `url` is still the page linked from the website
+#   fetch     "html" (plain download, default) or "browser" (Playwright, for JavaScript-built pages)
+#   options   extra settings passed to the parser (optional)
+#   enabled   set to false to skip a resort (e.g. parser not written yet, or site broken)
+
+# Months when lift data is collected (inclusive). Outside them the daily run only saves a
+# small monthly check-in, which keeps GitHub from switching the schedule off.
+season:
+  start_month: 11   # November
+  end_month: 4      # April
+
+resorts:
+  # --- Hokkaido ---
+  - id: niseko-hirafu
+    name: Niseko Grand Hirafu
+    region: Hokkaido
+    url: https://www.grand-hirafu.jp/snow/status/
+    parser: niseko
+    enabled: true
+
+  - id: kiroro
+    name: Kiroro
+    region: Hokkaido
+    url: https://www.kiroro.co.jp/dashboard/
+    parser: kiroro
+    enabled: true
+
+  - id: rusutsu
+    name: Rusutsu
+    region: Hokkaido
+    url: https://rusutsu.com/en/lift-and-trail-status/
+    data_url: https://rusutsu.com/assets/partial/ajax/trail-and-lift/get-front.php
+    parser: rusutsu
+    enabled: true
+
+  - id: furano
+    name: Furano
+    region: Hokkaido
+    url: https://furapuri.com/ski/
+    data_url: https://furapuri.com/ski/data.json
+    parser: furano
+    enabled: true
+
+  - id: tomamu
+    name: Tomamu
+    region: Hokkaido
+    url: https://www.snowtomamu.jp/winter/en/ski/ski-slope/condition/
+    parser: tomamu
+    enabled: true
+
+  - id: sapporo-kokusai
+    name: Sapporo Kokusai
+    region: Hokkaido
+    url: https://www.sapporo-kokusai.jp/en/slopes/
+    parser: sapporo_kokusai
+    enabled: true
+
+  - id: sapporo-teine
+    name: Sapporo Teine
+    region: Hokkaido
+    url: https://sapporo-teine.com/snow/gelande-report-en
+    parser: sapporo_teine
+    enabled: true
+
+  # --- Nagano ---
+  - id: shiga-kogen
+    name: Shiga Kogen
+    region: Nagano
+    url: https://www.shigakogen.gr.jp/english/lift_information/
+    parser: shiga_kogen
+    enabled: true
+
+  - id: hakuba-goryu
+    name: Hakuba Goryu
+    region: Nagano
+    url: http://hakubavalley.com/en/weather_en/
+    parser: hakuba_valley
+    options: { area: goryu }
+    enabled: true
+
+  - id: hakuba-47
+    name: Hakuba 47
+    region: Nagano
+    url: http://hakubavalley.com/en/weather_en/
+    parser: hakuba_valley
+    options: { area: "47" }
+    enabled: true
+
+  - id: hakuba-happo-one
+    name: Hakuba Happo-one
+    region: Nagano
+    url: http://hakubavalley.com/en/weather_en/
+    parser: hakuba_valley
+    options: { area: happo-one }
+    enabled: true
+
+  - id: nozawa-onsen
+    name: Nozawa Onsen
+    region: Nagano
+    url: https://en.nozawaski.com/the-mountain/moutain-info/slopes-lifts/
+    parser: nozawa
+    enabled: true
+
+  # --- Niigata ---
+  - id: gala-yuzawa
+    name: GALA Yuzawa
+    region: Niigata
+    url: https://gala.co.jp/winter/gelande/?wovn=en
+    parser: gala_yuzawa
+    enabled: true
+
+  # --- Yamagata ---
+  - id: zao-onsen
+    name: Zao Onsen
+    region: Yamagata
+    url: https://zaomountainresort.com/ski/
+    parser: zao
+    enabled: true

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Japan Ski Lift Status</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <h1>Japan Ski Lift Status</h1>
+      <p class="sub">Which lifts were running each morning (about 09:30 JST).</p>
+      <div class="controls">
+        <label for="date">Day
+          <select id="date"></select>
+        </label>
+        <span id="updated" class="muted"></span>
+      </div>
+      <p id="season-note" class="season-note" hidden></p>
+    </div>
+  </header>
+
+  <main class="wrap" id="app">
+    <p class="muted">Loading…</p>
+  </main>
+
+  <footer class="wrap muted small">
+    Data collected once a day from each resort's own status page. Statuses can change during the day,
+    so always check the resort's site before you go. "N/A" means the resort doesn't publish that information.
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

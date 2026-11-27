@@ -1,0 +1,1111 @@
+
+
+
+
+<!DOCTYPE html>
+<html>
+ 
+<head>
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta charset="utf-8"> 
+<title> &raquo; 蔵王温泉スキー場蔵王温泉マウンテン＆スノーリゾート｜蔵王温泉公式サイト</title>
+<meta name="description" content="">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<link rel="stylesheet" type="text/css" href="//cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@100;300;400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/css/style.css">
+<link rel="stylesheet" href="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/style.css">
+<link rel="stylesheet" href="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/css/ski.css">
+
+<!-- IE8以下用に2つのスクリプトを記述
+     html5shiv.js: IE8以下にHTML5の要素を認識するようにさせる
+     respond.js: IE8以下にMedia Queriesの代替え機能を提供 -->
+<!--[if lt IE 9]>
+<script src="//cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.2/html5shiv.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/respond.js/1.4.2/respond.min.js"></script>
+<![endif]-->
+ 
+<link rel="shortcut icon" href="">
+ 
+<!--
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" sizes="196x196" href="">
+<link rel="apple-touch-icon" sizes="152x152" href="">
+-->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
+<script type="text/javascript">
+$(function() {
+
+ 	$('.menu-trigger')
+		.on(
+			'click'
+			,  function() {
+				$(this).toggleClass('active');
+				$('#mob-nav').toggleClass('active');
+    			return false;
+  			}
+		);
+
+	$( window )
+		.on(
+			'scroll'
+			, function() {
+				if ( 45 <$( this ).scrollTop() ) { // 1000px以上スクロールしたら
+					$( 'header' ).addClass( 'm_fixed' );
+					$( '.subpage' ).addClass( 'm_fixed' );
+					$( '#feature' ).addClass( 'm_fixed' );
+				} else {
+					$( 'header' ).removeClass( 'm_fixed' );
+					$( '.subpage' ).removeClass( 'm_fixed' );
+					$( '#feature' ).removeClass( 'm_fixed' );
+				}
+			}
+		);
+
+	$('.winter-button')
+		.click(
+			function() {
+				var ajaxurl = 'https://zaomountainresort.com/wp-admin/admin-ajax.php';
+        	// ボタンがクリックされたときの処理
+        	// alert('winterbutton');
+        	$.ajax({
+            	type: 'POST',
+            	url: ajaxurl, // WordPressが提供するAjaxのエンドポイント
+            	data: {
+                	action: 'winter_selected' // サーバーサイドの関数名
+            	},
+            	success: function(response) {
+                	// サーバーサイドからの応答を処理
+                	console.log(response);
+						window.location.href = 'https://zaomountainresort.com/winter/';
+            	}
+        	});
+    		}
+		);
+	
+	$('[id^="trans-"]')
+		.click(
+			function() {
+				var target_lang = "";			
+				if( $( this ).attr( "id" ) == "trans-en" ) {
+					target_lang = "en";
+				} else if( $( this ).attr( "id" ) == "trans-cn" ) {
+					target_lang = "zh-CN";
+				} else if( $( this ).attr( "id" ) == "trans-tw" ) {
+					target_lang = "zh-TW";
+				} else if( $( this ).attr( "id" ) == "trans-kr" ) {
+					target_lang = "ko";
+				}
+				var target_uri = "https://translate.google.com/translate\?hl=ja&sl=auto&tl=" + target_lang
+										+"&u=" + "https://zaomountainresort.com" + encodeURI( location.pathname );
+				location = target_uri;
+			}
+		);
+	$('.wamazing')
+		.click(
+			function() {
+				var lang_name = encodeURI( location.search );
+				var lang_position_en = lang_name.indexOf('tl=en', 0);
+				var lang_position_cn = lang_name.indexOf('tl=zh-CN', 0);
+				var lang_position_tw = lang_name.indexOf('tl=zh-TW', 0);
+				var lang_position_ko = lang_name.indexOf('tl=ko', 0);
+				if(lang_position_en > 0) {
+					window.open('https://www.wamazing.com/snow/languages.html?source=emFvLW9uc2Vu', '_blank');
+				} else if( lang_position_cn > 0) {
+						window.open('https://p.wamazing-cn.com/snow/languages.html?source=emFvLW9uc2Vu', '_blank');
+				} else if( lang_position_tw > 0) {
+						window.open('https://tw.wamazing.com/snow/languages.html?source=emFvLW9uc2Vu', '_blank');
+				} else if( lang_position_ko > 0) {
+						window.open('https://www.wamazing.com/snow/languages.html?source=emFvLW9uc2Vu', '_blank');
+				} else {
+						window.open('https://jp.wamazing.com/snow/languages.html?source=emFvLW9uc2Vu','_blank');					
+				}
+			}
+		);
+});
+</script>
+
+</head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-QV29Z65W6H"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-QV29Z65W6H');
+</script>
+<body id="ski">
+ 
+<header>
+	<div class="subhead">
+		<h2>蔵王温泉マウンテン＆スノーリゾート</h2>
+		<div class="subnav">
+			<a href="https://zaomountainresort.com/winter/" class="txtlink">観光情報</a>
+			<a href="https://zaomountainresort.com/live-camera-ski/" class="txtlink">ライブカメラ</a>
+			<a href="https://zaomountainresort.com/ski_news/" class="txtlink">お知らせ</a>
+			<!--<a href="https://zaomountainresort.com/contact/" class="txtlink">お問い合わせ</a>-->
+			<div>Language&nbsp;<img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/images/header/mark.png" alt="">
+				<ul class="second_level">
+					<li><a id="trans-en">English</a></li>
+					<li><a id="trans-cn">简体字</a></li>
+					<li><a id="trans-tw">繁體中文</a></li>
+					<li><a id="trans-kr">한국어</a></li>
+				</ul>
+			</div>
+			<a href="https://twitter.com/jukkiikun" class="sns"><img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/images/header/ic_twi.png" alt="twitter"></a>
+			<a href="https://www.facebook.com/1673325826237829/" class="sns"><img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/images/header/ic_fb.png" alt="facebook"></a>
+			<a href="https://www.instagram.com/zao_onsen/" class="sns"><img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/images/header/ic_insta.png" alt="instagram"></a>
+		</div>
+	</div>
+	<div class="mainhead">
+		<h1><img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/images/header/logo.svg" alt="蔵王温泉スキー場"></h1>
+		<nav>
+			<a href="https://zaomountainresort.com/ski/" class="txtlink">TOP</a>
+			<a href="https://zaomountainresort.com/area-information/" class="txtlink">ゲレンデ情報</a>
+			<a href="https://zaomountainresort.com/gerende/" class="txtlink">ゲレンデマップ</a>
+			<a href="https://zaomountainresort.com/chrage/" class="txtlink">料金</a>
+			<a href="https://zaomountainresort.com/restaurant/" class="txtlink">レストラン</a>
+			<a href="https://zaomountainresort.com/parking/" class="txtlink">アクセス・駐車場</a>
+		</nav>
+	</div>
+</header>
+
+	
+<div id="mobHead">
+	<h1 class="image"><img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/images/header/logo.svg" alt="蔵王温泉観光協会"></h1>
+</div>
+<!---
+			<div class="lang">Language&nbsp;<img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/images/header/mark.png" alt="">
+				<ul class="second_level">
+					<li><a id="trans-en">English</a></li>
+					<li><a id="trans-cn">简体字</a></li>
+					<li><a id="trans-tw">繁體中文</a></li>
+					<li><a id="trans-kr">한국어</a></li>
+				</ul>
+			</div>
+-->
+<div class="menu-trigger">
+  <span></span>
+  <span></span>
+  <span></span>
+</div>
+
+<div id="mob-nav">
+	<p><a href="https://zaomountainresort.com/ski/" class="txtlink">TOP</a></p>
+			<p><a href="https://zaomountainresort.com/area-information/" class="txtlink">ゲレンデ情報</a></p>
+			<p><a href="https://zaomountainresort.com/gerende/" class="txtlink">ゲレンデマップ</a></p>
+			<p><a href="https://zaomountainresort.com/chrage/" class="txtlink">料金</a></p>
+			<p><a href="https://zaomountainresort.com/parking/" class="txtlink">駐車場</a></p>
+			<p><a href="https://zaomountainresort.com/restaurant/" class="txtlink">レストラン</a></p>
+			<p><a href="https://zaomountainresort.com/ski_news/" class="txtlink">お知らせ</a></p>
+			<p><a href="https://zaomountainresort.com/livecamera/" class="txtlink">ライブカメラ</a></p>
+			<p><a href="https://zaomountainresort.com/rental/" class="txtlink">レンタルショップ一覧</a></p>
+			<p><a href="https://zaomountainresort.com/school/" class="txtlink">スクール一覧</a></p>
+		<p><a id="trans-en">English</a></p>
+		<p><a id="trans-cn">简体字</a></p>
+		<p><a id="trans-tw">繁體中文</a></p>
+		<p><a id="trans-kr">한국어</a></p>	<p><a href="https://zaomountainresort.com/winter/" class="txtlink">観光情報</a></p>
+
+	</div>
+
+<script src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/js/index.js"></script>
+<style>
+	#ticket_float {
+		position: fixed;
+		right: 3rem;
+		bottom: 3rem;
+		z-index: 999;
+	}
+	#ticket_float a {
+		display: block;
+		width: 250px;
+		background-color: #49536D;
+		color: #ffffff;
+		text-align: center;
+		text-decoration: none;
+		box-sizing: border-box;
+		padding: 0.7rem;
+		border-radius: 10px;
+		font-size: 1rem;
+		line-height: 1.5;
+		transition: .3s;
+	}
+	#ticket_float a span {
+		font-size: 1.3rem;
+		font-weight: 900;
+	}
+	#ticket_float a:hover {
+		background-color: #788299;
+	}
+	@media screen and (max-width: 768px) {
+		#ticket_float {right: 1rem;}
+	}
+</style>
+<div id="ticket_float">
+	<a href="https://zaomountainresort.com/chrage/">2026-27シーズン<br><span>お得なリフト券</span>販売中！</a>
+</div>
+<script src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/js/index.js"></script>
+    <div class="topmovie pcblock">
+        <div id="youtube-area">
+            <div id="youtube"></div>
+            <div id="youtube-mask"></div>
+        </div>
+    </div>
+    <div class="topimg spblock">
+        <img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/img/index/sptop.png" alt="名湯名山スキーリゾート　山形蔵王温泉スキー場">
+    </div>
+
+
+<div class="mob-title">
+	<h1>蔵王温泉スキー場</h1>
+</div>
+
+
+<section id="winterbord">
+	<div class="wrapper">
+		<div class="weather">
+				<div class="date">
+					<span class="year">2026</span>
+              <span class="date">11.27</span>
+              <span class="week">金曜日</span>
+            </div>
+				<div class="weather-info-wrap">
+					
+					<div class="weatherinfo">
+	            	<div class="img">
+               		                                                                  <img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/img/index/weather/w4.svg" alt="icon">
+                                            	</div>
+						<p class="snowinfo">新雪：<span>5</span>cm</p>
+						<p class="snowinfo">積雪：<span>40</span>cm</p>
+          </div>
+					
+			<div class="temperature">
+				-5<span>℃</span>
+			</div>
+				</div>
+			<p class="lastposted">最終更新日時／
+                            <time>
+                                2026-11-25 15:31:24                            </time>
+                        </p>
+		</div><!-- div.weather 閉じタグ-->
+		
+		<div class="quicknav">
+			<div class="qnav-btn">
+				<a href="https://zaomountainresort.com/ropeway-lift-information/">
+           		<div class="img"><img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/img/index/icon1.svg" alt="icon"></div>
+              <div class="txt"><p>ロープウェイ・リフト<br>運行状況</p></div>
+            </a>				
+			</div>
+			<div class="qnav-btn">
+                   <a href="https://zaomountainresort.com/course-gelande-infomation/">
+                        <div class="img"><img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/img/index/icon2.svg" alt="icon"></div>
+                        <div class="txt"><p>コース・ゲレンデ<br>最新状況</p></div>
+                    </a>
+			</div>
+		<div class="qnav-btn sp_only">
+			<a href="https://zaomountainresort.com/area-information/">
+				<div class="img"><img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/images/home/area.svg" alt="rescue"></div>
+				<div class="txt">本日のエリア情報</div>
+			</a>
+		</div>			<div class="qnav-btn">
+                    <a href="https://zaomountainresort.com/live-camera-ski/">
+                        <div class="img"><img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/img/index/icon3.svg" alt="icon"></div>
+                        <div class="txt"><p>混雑状況<br>（ライブカメラ）</p></div>
+                    </a>
+			</div>
+			<div class="qnav-btn">
+                    <a href="https://weathernews.jp/s/ski/spot/33501/">
+                        <div class="img"><img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/img/index/icon4.svg" alt="icon"></div>
+                        <div class="txt"><p>週間天気予報<br>（外部リンク）</p></div>
+                    </a>
+			</div>
+			<div class="qnav-btn">
+                    <a href="https://zaomountainresort.com/parking/" target="_blank">
+                        <div class="img"><img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/img/index/bus.svg" alt="icon"></div>
+                        <div class="txt"><p>アクセス情報</p></div>
+                    </a>
+			</div>
+		<div class="qnav-btn sp_only">
+			<a href="tel:0236949215">
+				<div class="img"><img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/images/home/sos.svg" alt="rescue"></div>
+				<div class="txt">救助要請（電話）</div>
+			</a>
+		</div>
+		
+		</div>
+		
+			</div><!-- div.wrapper 閉じタグ -->
+
+</section>
+
+<section id="wifi">
+	<div class="wrapper">
+		<p class="mark image"><img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/images/ski/wifi.png"></p>
+		<p class="tit image"><img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/images/ski/wifi_zao.png"></p>
+		<div class="detail">
+			<dl>
+				<dt>SSID：</dt>
+				<dd>ZAOONSENSKI</dd>
+			</dl>
+			<dl>
+				<dt>PASSWORD：</dt>
+				<dd>yamagatazao</dd>
+			</dl>
+		</div>
+	</div>
+</section>	
+
+
+<section id="box_campaign">
+	<h1>CAMPAIGN&amp;EVENT</h1>
+	<div class="wrapper">
+
+		       <article>
+		   <a href="https://widgets.bokun.io/online-sales/59594662-d1cf-4f27-bfb7-75910a192a41/experience/993962">
+			   <div class="image">
+				   	<img src="https://zaomountainresort.com/wp-content/uploads/2025/12/Group-33.jpg" alt="予約制駐車場の案内～横倉第３駐車場～" >
+ 			   </div>
+		   </a>
+       </article>
+
+             <article>
+		   <a href="https://zaomountainresort.com/congestion/">
+			   <div class="image">
+				   	<img src="https://zaomountainresort.com/wp-content/uploads/2024/12/model.jpg" alt="冬の蔵王の歩き方" >
+ 			   </div>
+		   </a>
+       </article>
+
+             <article>
+		   <a href="https://zaomountainresort.com/page-3528/">
+			   <div class="image">
+				   	<img src="https://zaomountainresort.com/wp-content/uploads/2023/12/bn_available.jpg" alt="ゲレンデ利用可能滑走具一覧" >
+ 			   </div>
+		   </a>
+       </article>
+
+      		
+		
+		
+		
+	</div><!-- .wrapper 閉じタグ-->
+</section>
+
+
+<section id="service">
+	<div class="inner">
+	<div class="titlearea">
+		<h1>SERVICE STATUS</h1>
+		<div class="tab">
+			<p class="tab_rope active">ロープウェイ・リフト</p>			
+			<p class="tab_course">コース・ゲレンデ</p>			
+			<p class="tab_area">エリア</p>				
+		</div>
+	</div>
+		
+		
+		
+		<div class="service_container">
+                 <div class="tab_container">
+                    <div class="tab_rope_content tab_content active">
+                        <div class="single_content" data-simplebar data-simplebar-auto-hide="false">
+                            <table class="tbl_normal tbl_ropeway">
+                                <thead>
+                                    <tr>
+                                        <th></th>
+                                        <th>ロープウェイ・リフト名</th>
+                                        <th>運行状況</th>
+                                        <th>営業時間</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                                                        <tr>
+                                        <td class="num" data-title="番号">2</td>
+                                        <td class="name">蔵王ロープウェイ山頂線</td>
+                                        <td class="jyoko" data-title="運行状況">平常運転</td>
+                                        <td class="time" data-title="営業時間">08:30〜16:00</td>
+                                    </tr>
+                                                                                                            <tr>
+                                        <td class="num" data-title="番号">20</td>
+                                        <td class="name">菖蒲沼第２ペア</td>
+                                        <td class="jyoko" data-title="運行状況">-</td>
+                                        <td class="time" data-title="営業時間">〜</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="num" data-title="番号">17</td>
+                                        <td class="name">蔵王パラダイスペアＡ・Ｂ</td>
+                                        <td class="jyoko" data-title="運行状況">-</td>
+                                        <td class="time" data-title="営業時間">〜</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="num" data-title="番号">16</td>
+                                        <td class="name">片貝トリプル</td>
+                                        <td class="jyoko" data-title="運行状況">-</td>
+                                        <td class="time" data-title="営業時間">〜</td>
+                                    </tr>
+                                                                                                            <tr>
+                                        <td class="num" data-title="番号">35</td>
+                                        <td class="name">ダイヤモンド第２ペア</td>
+                                        <td class="jyoko" data-title="運行状況">-</td>
+                                        <td class="time" data-title="営業時間">〜</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="num" data-title="番号">33</td>
+                                        <td class="name">見返りペア</td>
+                                        <td class="jyoko" data-title="運行状況">-</td>
+                                        <td class="time" data-title="営業時間">〜</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="num" data-title="番号">14</td>
+                                        <td class="name">中央第１ペアＡＢ</td>
+                                        <td class="jyoko" data-title="運行状況">-</td>
+                                        <td class="time" data-title="営業時間">〜</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="num" data-title="番号">12</td>
+                                        <td class="name">中央第２ペアＡＢ</td>
+                                        <td class="jyoko" data-title="運行状況">-</td>
+                                        <td class="time" data-title="営業時間">〜</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="num" data-title="番号">3</td>
+                                        <td class="name">蔵王中央ロープウェイ</td>
+                                        <td class="jyoko" data-title="運行状況">運転見合わせ</td>
+                                        <td class="time" data-title="営業時間">08:30〜16:00</td>
+                                    </tr>
+                                                                                                            <tr>
+                                        <td class="num" data-title="番号">39</td>
+                                        <td class="name">黒姫第１クワトロ</td>
+                                        <td class="jyoko" data-title="運行状況">-</td>
+                                        <td class="time" data-title="営業時間">〜</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="num" data-title="番号">28</td>
+                                        <td class="name">アストリア第３ペア</td>
+                                        <td class="jyoko" data-title="運行状況">-</td>
+                                        <td class="time" data-title="営業時間">〜</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="num" data-title="番号">22</td>
+                                        <td class="name">ユートピア第２ペア</td>
+                                        <td class="jyoko" data-title="運行状況">-</td>
+                                        <td class="time" data-title="営業時間">〜</td>
+                                    </tr>
+                                                                                                            <tr>
+                                        <td class="num" data-title="番号">31</td>
+                                        <td class="name">中森第１トリプル</td>
+                                        <td class="jyoko" data-title="運行状況">-</td>
+                                        <td class="time" data-title="営業時間">〜</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="num" data-title="番号">32</td>
+                                        <td class="name">蔵王国体ペア</td>
+                                        <td class="jyoko" data-title="運行状況">-</td>
+                                        <td class="time" data-title="営業時間">〜</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="num" data-title="番号">37</td>
+                                        <td class="name">温泉第４クワット</td>
+                                        <td class="jyoko" data-title="運行状況">-</td>
+                                        <td class="time" data-title="営業時間">〜</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="num" data-title="番号">30</td>
+                                        <td class="name">中森第２ペア</td>
+                                        <td class="jyoko" data-title="運行状況">-</td>
+                                        <td class="time" data-title="営業時間">〜</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="num" data-title="番号">29</td>
+                                        <td class="name">サンライズペア</td>
+                                        <td class="jyoko" data-title="運行状況">-</td>
+                                        <td class="time" data-title="営業時間">〜</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="num" data-title="番号">8</td>
+                                        <td class="name">竜山ペア</td>
+                                        <td class="jyoko" data-title="運行状況">-</td>
+                                        <td class="time" data-title="営業時間">〜</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="num" data-title="番号">7</td>
+                                        <td class="name">温泉第３パラレルＡＢ</td>
+                                        <td class="jyoko" data-title="運行状況">-</td>
+                                        <td class="time" data-title="営業時間">〜</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="num" data-title="番号">6</td>
+                                        <td class="name">温泉第２クワット</td>
+                                        <td class="jyoko" data-title="運行状況">-</td>
+                                        <td class="time" data-title="営業時間">〜</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="num" data-title="番号">5</td>
+                                        <td class="name">温泉第１ペア</td>
+                                        <td class="jyoko" data-title="運行状況">-</td>
+                                        <td class="time" data-title="営業時間">〜</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="num" data-title="番号">4</td>
+                                        <td class="name">スカイケーブル</td>
+                                        <td class="jyoko" data-title="運行状況">平常運転</td>
+                                        <td class="time" data-title="営業時間">08:30〜16:00</td>
+                                    </tr>
+                                                                                                            <tr>
+                                        <td class="num" data-title="番号">38</td>
+                                        <td class="name">大森クワトロ</td>
+                                        <td class="jyoko" data-title="運行状況">-</td>
+                                        <td class="time" data-title="営業時間">〜</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="num" data-title="番号">27</td>
+                                        <td class="name">アストリア第２ペア</td>
+                                        <td class="jyoko" data-title="運行状況">-</td>
+                                        <td class="time" data-title="営業時間">〜</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="num" data-title="番号">23</td>
+                                        <td class="name">横倉ペア</td>
+                                        <td class="jyoko" data-title="運行状況">-</td>
+                                        <td class="time" data-title="営業時間">〜</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="num" data-title="番号">1</td>
+                                        <td class="name">蔵王ロープウェイ山麓線</td>
+                                        <td class="jyoko" data-title="運行状況">平常運転</td>
+                                        <td class="time" data-title="営業時間">08:30〜16:00</td>
+                                    </tr>
+                                                                    </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="tab_course_content tab_content">
+                        <div class="single_content" data-simplebar data-simplebar-auto-hide="false">
+                            <table class="tbl_normal tbl_course">
+                                <thead>
+                                    <tr>
+                                        <th>コース・ゲレンデ名</th>
+                                        <th>滑走可否</th>
+                                        <th>雪質</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                                                        <tr>
+                                        <td class="name">ザンゲ坂・樹氷原コース</td>
+                                        <td class="kahi" data-title="滑走可否">滑走不可</td>
+                                        <td class="yukishitsu" data-title="雪質">-</td>
+                                    </tr>
+                                                                                                            <tr>
+                                        <td class="name">パラダイスゲレンデ</td>
+                                        <td class="kahi" data-title="滑走可否">滑走不可</td>
+                                        <td class="yukishitsu" data-title="雪質">-</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="name">パラダイス迂回コース</td>
+                                        <td class="kahi" data-title="滑走可否">滑走不可</td>
+                                        <td class="yukishitsu" data-title="雪質">-</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="name">連絡コース</td>
+                                        <td class="kahi" data-title="滑走可否">滑走不可</td>
+                                        <td class="yukishitsu" data-title="雪質">-</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="name">菖蒲沼ゲレンデ</td>
+                                        <td class="kahi" data-title="滑走可否">滑走不可</td>
+                                        <td class="yukishitsu" data-title="雪質">-</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="name">大平コース</td>
+                                        <td class="kahi" data-title="滑走可否">滑走不可</td>
+                                        <td class="yukishitsu" data-title="雪質">-</td>
+                                    </tr>
+                                                                                                            <tr>
+                                        <td class="name">中央ゲレンデ</td>
+                                        <td class="kahi" data-title="滑走可否">滑走不可</td>
+                                        <td class="yukishitsu" data-title="雪質">-</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="name">ダイヤモンドバレー</td>
+                                        <td class="kahi" data-title="滑走可否">滑走不可</td>
+                                        <td class="yukishitsu" data-title="雪質">-</td>
+                                    </tr>
+                                                                                                            <tr>
+                                        <td class="name">ユートピアゲレンデ</td>
+                                        <td class="kahi" data-title="滑走可否">滑走不可</td>
+                                        <td class="yukishitsu" data-title="雪質">-</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="name">百万人ゲレンデ</td>
+                                        <td class="kahi" data-title="滑走可否">滑走不可</td>
+                                        <td class="yukishitsu" data-title="雪質">-</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="name">黒姫ゲレンデ</td>
+                                        <td class="kahi" data-title="滑走可否">滑走不可</td>
+                                        <td class="yukishitsu" data-title="雪質">-</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="name">黒姫スーパージャイアントコース</td>
+                                        <td class="kahi" data-title="滑走可否">滑走不可</td>
+                                        <td class="yukishitsu" data-title="雪質">-</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="name">黒姫コネクションコース</td>
+                                        <td class="kahi" data-title="滑走可否">滑走不可</td>
+                                        <td class="yukishitsu" data-title="雪質">-</td>
+                                    </tr>
+                                                                                                            <tr>
+                                        <td class="name">高鳥コース</td>
+                                        <td class="kahi" data-title="滑走可否">滑走不可</td>
+                                        <td class="yukishitsu" data-title="雪質">-</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="name">上の台ゲレンデ</td>
+                                        <td class="kahi" data-title="滑走可否">滑走不可</td>
+                                        <td class="yukishitsu" data-title="雪質">-</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="name">ハーネンカムＣコース</td>
+                                        <td class="kahi" data-title="滑走可否">滑走不可</td>
+                                        <td class="yukishitsu" data-title="雪質">-</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="name">ハーネンカムＡ・Ｂコース</td>
+                                        <td class="kahi" data-title="滑走可否">滑走不可</td>
+                                        <td class="yukishitsu" data-title="雪質">-</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="name">竜山ゲレンデ</td>
+                                        <td class="kahi" data-title="滑走可否">滑走不可</td>
+                                        <td class="yukishitsu" data-title="雪質">-</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="name">サンライズゲレンデ</td>
+                                        <td class="kahi" data-title="滑走可否">滑走不可</td>
+                                        <td class="yukishitsu" data-title="雪質">-</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="name">中森ゲレンデ</td>
+                                        <td class="kahi" data-title="滑走可否">滑走不可</td>
+                                        <td class="yukishitsu" data-title="雪質">-</td>
+                                    </tr>
+                                                                                                            <tr>
+                                        <td class="name">横倉ゲレンデ</td>
+                                        <td class="kahi" data-title="滑走可否">滑走不可</td>
+                                        <td class="yukishitsu" data-title="雪質">-</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="name">大森ゲレンデ</td>
+                                        <td class="kahi" data-title="滑走可否">滑走不可</td>
+                                        <td class="yukishitsu" data-title="雪質">-</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="name">大森ジャイアントコース</td>
+                                        <td class="kahi" data-title="滑走可否">滑走不可</td>
+                                        <td class="yukishitsu" data-title="雪質">-</td>
+                                    </tr>
+                                                                    </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="tab_area_content tab_content">
+                        <div class="single_content" data-simplebar data-simplebar-auto-hide="false">
+                            <table class="tbl_normal tbl_course">
+                                <thead>
+                                    <tr>
+                                        <th>エリア名</th>
+                                        <th>天候</th>
+                                        <th>気温</th>
+                                        <th>積雪量</th>
+                                        <th>更新日時</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                                                        <tr>
+                                        <td class="name"><a href="https://zaomountainresort.com/area/area-yokokuraoomori/">横倉・大森エリア</a></td>
+                                        <td class="weather">
+                                                                                                                                    <div class="img"><img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/img/index/weather/w4.svg" alt="icon"></div>
+                                            <div class="txt">雪</div>
+                                                                                    </td>
+                                        <td class="temperature" data-title="気温"><span>℃</span></td>
+                                        <td class="sekisetsu" data-title="積雪量"><span>cm</span></td>
+                                        <td class="date" data-title="更新日時">2026/11/25 11:03</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="name"><a href="https://zaomountainresort.com/area/area-uwanodai/">上の台エリア</a></td>
+                                        <td class="weather">
+                                                                                                                                    <div class="img"><img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/img/index/weather/w4.svg" alt="icon"></div>
+                                            <div class="txt">雪</div>
+                                                                                    </td>
+                                        <td class="temperature" data-title="気温"><span>℃</span></td>
+                                        <td class="sekisetsu" data-title="積雪量"><span>cm</span></td>
+                                        <td class="date" data-title="更新日時">2026/11/25 11:04</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="name"><a href="https://zaomountainresort.com/area/area-utopia/">ユートピアエリア</a></td>
+                                        <td class="weather">
+                                                                                                                                    <div class="img"><img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/img/index/weather/w4.svg" alt="icon"></div>
+                                            <div class="txt">雪</div>
+                                                                                    </td>
+                                        <td class="temperature" data-title="気温"><span>℃</span></td>
+                                        <td class="sekisetsu" data-title="積雪量"><span>cm</span></td>
+                                        <td class="date" data-title="更新日時">2026/11/25 11:04</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="name"><a href="https://zaomountainresort.com/area/area-chuo/">中央エリア</a></td>
+                                        <td class="weather">
+                                                                                                                                    <div class="img"><img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/img/index/weather/w4.svg" alt="icon"></div>
+                                            <div class="txt">雪</div>
+                                                                                    </td>
+                                        <td class="temperature" data-title="気温"><span>℃</span></td>
+                                        <td class="sekisetsu" data-title="積雪量"><span>cm</span></td>
+                                        <td class="date" data-title="更新日時">2026/11/25 11:04</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="name"><a href="https://zaomountainresort.com/area/area-paradise/">パラダイスエリア</a></td>
+                                        <td class="weather">
+                                                                                                                                    <div class="img"><img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/img/index/weather/w4.svg" alt="icon"></div>
+                                            <div class="txt">雪</div>
+                                                                                    </td>
+                                        <td class="temperature" data-title="気温"><span>℃</span></td>
+                                        <td class="sekisetsu" data-title="積雪量"><span>cm</span></td>
+                                        <td class="date" data-title="更新日時">2026/11/25 11:05</td>
+                                    </tr>
+                                                                        <tr>
+                                        <td class="name"><a href="https://zaomountainresort.com/area/area-juhyosancho/">樹氷・山頂エリア</a></td>
+                                        <td class="weather">
+                                                                                                                                    <div class="img"><img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/img/index/weather/w4.svg" alt="icon"></div>
+                                            <div class="txt">雪</div>
+                                                                                    </td>
+                                        <td class="temperature" data-title="気温"><span>℃</span></td>
+                                        <td class="sekisetsu" data-title="積雪量"><span>cm</span></td>
+                                        <td class="date" data-title="更新日時">2026/11/25 11:05</td>
+                                    </tr>
+                                                                    </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>				
+	</div>
+</section>
+
+<section id="newsarea">
+<div class="wrapper">
+
+	<div class="news news-content">
+		<h2>NEWS &amp; EVENT</h2>
+	
+
+
+
+	<article>
+		<p class="image"><img src=""></p>
+		<div class="detail">
+			<p class="date">2026年11月25日</p>
+			<h3>「中央ゲレンデ」2026年11月28日（土）プレオープン予定のお知らせ</h3>
+		</div>
+		<a href="https://zaomountainresort.com/ski_news/ski_news-7502/"></a>
+	</article>
+		
+
+
+
+	<article>
+		<p class="image"><img src="https://zaomountainresort.com/wp-content/uploads/2026/10/school-1-1.jpg"></p>
+		<div class="detail">
+			<p class="date">2026年11月19日</p>
+			<h3>NEW！！　                      　　　　　　　　　　　　　　　　　　　　　　　　　　　 スノースクール利用制度 Q&amp;A</h3>
+		</div>
+		<a href="https://zaomountainresort.com/ski_news/ski_news-7478/"></a>
+	</article>
+		
+
+
+
+	<article>
+		<p class="image"><img src="https://zaomountainresort.com/wp-content/uploads/2026/10/school-1-1.jpg"></p>
+		<div class="detail">
+			<p class="date">2026年10月29日</p>
+			<h3>【重要】蔵王温泉スキー場でレッスンを受けるお客様及びインバウンド向けスノースクールへの注意喚起</h3>
+		</div>
+		<a href="https://zaomountainresort.com/ski_news/ski_news-7405/"></a>
+	</article>
+		
+
+
+
+	<article>
+		<p class="image"><img src="https://zaomountainresort.com/wp-content/uploads/2026/10/school-1-1.jpg"></p>
+		<div class="detail">
+			<p class="date">2026年10月29日</p>
+			<h3>NEW ‼　2026-2027シーズン スノースクール等の申込について</h3>
+		</div>
+		<a href="https://zaomountainresort.com/ski_news/ski_news-7397/"></a>
+	</article>
+		
+
+
+
+	<article>
+		<p class="image"><img src=""></p>
+		<div class="detail">
+			<p class="date">2026年8月27日</p>
+			<h3>2026-2027シーズンスノースクール等の受入制度について</h3>
+		</div>
+		<a href="https://zaomountainresort.com/ski_news/ski_news-7284/"></a>
+	</article>
+			
+		
+		
+	<article></article>
+<article></article>
+<article></article>
+<article></article>
+<article></article>
+	
+	</div>
+
+
+	
+	
+
+
+</div>
+	
+<a href="ski_news/" class="button">新着情報一覧</a>
+</section>
+
+
+    <section class="slope">
+        <div class="inner">
+            <div class="h2_wrap">
+                <h2>
+                    <span>SLOPE&nbsp;MAP</span>
+                </h2>
+            </div>
+            <div class="flexbox">
+                <div class="img">
+                    <img src="https://zaomountainresort.com/wp-content/uploads/2023/11/gmap2024_l.png" alt="SLOPE MAP">
+                </div>
+                <div class="txt">
+                    <dl>
+                        <div>
+                            <dt>ゲレンデ数</dt>
+                            <dd>14<span>ゲレンデ</span></dd>
+                        </div>
+                        <div>
+                            <dt>コース数</dt>
+                            <dd>12<span>コース</span></dd>
+                        </div>
+                        <div>
+                            <dt>標高</dt>
+                            <dd><span>TOP</span>1,661<span>m</span><br><span>BOTTOM</span>780<span>m</span></dd>
+                        </div>
+                        <div>
+                            <dt>最大滑走距離</dt>
+                            <dd><span>約&nbsp;</span>10<span>km</span></dd>
+                        </div>
+                    </dl>
+					<a href="https://zaomountainresort.com/gerende/">ゲレンデマップ</a>
+                </div>
+            </div>
+        </div><!--endinner-->
+    </section>
+
+    <section class="lift">
+        <div class="inner">
+        	<h2>On-Line&nbsp;Shop</h2>
+            <div class="flexbox">
+                <div class="img">
+                        <img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/img/zao-web-booking-banner.png" alt="WAmazing Snow">
+                </div>
+                <div class="txt">
+                    <p>リフト券はWebから事前購入が便利！<br>
+                        購入後に発行されるQRコードをリフト券売場に設置されている無人発券機にかざすだけで、チケットを受け取ることができます。
+                        非対面、かつ、スムーズなWeb販売を是非ご活用ください。</p>
+                    <div class="btn_wrap">
+                        <a href="https://zaomountainresort.com/chrage/">料金を見る</a>
+                    </div>
+                </div>
+            </div>
+        </div><!--endinner-->
+    </section>
+
+    <section class="others bg">
+        <div class="inner">
+            <ul class="nonstyle ul_flex">
+                <li>
+                    <div class="img">
+                        <img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/img/index/others1.jpg" alt="レンタル">
+                        <p><span>レンタル</span></p>
+                    </div>
+                    <div class="txt">
+                        <p>スキー場内には10店舗以上のショップが勢ぞろい。手ぶらで気軽にスキー・スノーボードを楽しむなら、現地でのレンタルを積極的に活用しましょう。</p>
+						<a href="https://zaomountainresort.com/rental/">レンタル</a>
+					</div>
+				</li>
+                <li>
+                    <div class="img">
+                        <img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/img/index/others2.jpg" alt="レッスン・スクール">
+                        <p><span>レッスン・スクール</span></p>
+                    </div>
+                    <div class="txt">
+                        <p>お子様やスキー・スノーボード初心者向けから、ベテラン向けのキャンプまで蔵王なら多種多様！レベルやニーズに合わせて選びましょう。</p>
+						<a href="https://zaomountainresort.com/school/">スクール</a>
+                    </div>
+                </li>
+                <li>
+                    <div class="img">
+                        <img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/img/index/others3.jpg" alt="レストラン・飲食店">
+                        <p><span>レストラン・飲食店</span></p>
+                    </div>
+                    <div class="txt">
+                        <p>スキー場内に10店以上もあるレストラン。各店舗の場所や名物をチェックして、ランチタイムはもちろんちょっとした休憩にも利用しましょう。</p>
+						<a href="https://zaomountainresort.com/restaurant/">レストラン</a>
+                    </div>
+                </li>
+            </ul>
+        </div><!--endinner-->
+    </section>
+
+    <section class="access">
+        <div class="inner">
+            <div class="flexbox">
+                <div class="txt">
+                    <p class="name">蔵王温泉スキー場</p>
+                    <p class="add">〒990-2301　<br class="brsp">山形市蔵王温泉土合709-1</p>
+                    <p class="tel">TEL.023-694-9617</p>
+                    <p class="fax">FAX.023-694-9077</p>
+							<a href="https://zaomountainresort.com/access/">駐車場情報</a>
+                </div>
+                <div class="ggmap">
+                    <iframe src="https://www.google.com/maps/embed?pb=!1m12!1m8!1m3!1d25094.898279440953!2d140.382981!3d38.16664!3m2!1i1024!2i768!4f13.1!2m1!1z6JS1546L5rip5rOJ44K544Kt44O85aC0!5e0!3m2!1sja!2sjp!4v1663822772691!5m2!1sja!2sjp" width="600" height="450" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+                </div>
+            </div>
+        </div>
+    </section>
+
+<section id="banner_area">
+	<article></article>
+	<article><a href="http://www.jupeer-zao.com/" class="image" target="_blank"><img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/images/banner/bn_jupeer.jpg" alt=""></a></article>
+	<article><a href="http://zaochuoropeway.co.jp/jp/summer/index.php" class="image" target="_blank"><img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/images/banner/bn_cnt.jpg" alt=""></a></article>
+	<article><a href="http://zaoropeway.co.jp/" class="image" target="_blank"><img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/images/banner/bn_rope.jpg" alt=""></a></article>
+	<article></article>
+</section>
+
+
+    <section class="bnr">
+        <div class="inner">
+                <ul class="nonstyle">
+                                                                                                                                                                            </ul>
+        </div>
+    </section>
+	
+</main>
+<!-- end mein -->
+
+
+<script>
+jQuery(document).ready(function($) {
+
+$('.tab_rope').click(function() {
+	$('.tab_rope_content').addClass('active');
+	$('.tab_course_content').removeClass('active');
+	$('.tab_area_content').removeClass('active');	
+	$('.tab_rope').addClass('active');
+	$('.tab_course').removeClass('active');
+	$('.tab_area').removeClass('active');	
+});
+$('.tab_course').click(function() {
+	$('.tab_rope_content').removeClass('active');
+	$('.tab_course_content').addClass('active');
+	$('.tab_area_content').removeClass('active');	
+	$('.tab_rope').removeClass('active');
+	$('.tab_course').addClass('active');
+	$('.tab_area').removeClass('active');	
+});
+$('.tab_area').click(function() {
+	$('.tab_rope_content').removeClass('active');
+	$('.tab_course_content').removeClass('active');
+	$('.tab_area_content').addClass('active');	
+	$('.tab_rope').removeClass('active');
+	$('.tab_course').removeClass('active');
+	$('.tab_area').addClass('active');	
+});
+});
+</script>
+
+<footer>
+
+
+	<section id="fsubnav">
+			<a href="" class="txtlink winter-button">ウィンターシーズントップ</a>
+			<a href="https://zaomountainresort.com/ski_news/" class="txtlink">お知らせ</a>
+			<a href="https://zaomountainresort.com/live-camera-ski/" class="txtlink">ライブカメラ</a>
+			<a href="https://zaomountainresort.com/rental/" class="txtlink">レンタル</a>
+			<a href="https://zaomountainresort.com/school/" class="txtlink">スクール</a>
+	</section>
+	
+
+	<div class="wrapper">
+		<div class="logoarea">
+			<p class="sitelogo"><img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/images/header/logo.png" alt=""></p>
+			<h3>蔵王温泉マウンテン＆スノーリゾート</h3>
+		</div>
+		<div class="address">
+			<p>蔵王索道協会</p>
+			<p>〒990-2301 山形市蔵王温泉土合709−1</p>
+			<p>TEL.023-694-9617</p><p>FAX.023-694-9077</p>
+		</div>
+		
+		<div class="footerbanner">
+			<div class="image">
+				<img src="https://zaomountainresort.com/wp-content/themes/zao-spa-mobile/img/index/icon1.svg" alt="">
+			</div>
+			<div class="lift_ticket">
+				<h2>リフト券はスマホで「WEB予約」</h2>
+				<p>混雑知らず！QRコードをかざすだけ！</p>
+				<p>ICカードリフト券でそのままゲートイン！</p>
+				<p class="link">リフト券WEB予約はこちらから</p>
+			</div>
+			<a href="https://zaomountainresort.com/chrage/"></a>
+		</div>
+
+		
+	</div>
+</footer>
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-68204628-1"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'UA-68204628-1');
+</script>
+
+
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=AW-16657649839"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'AW-16657649839');
+</script>
+
+
+</body>
+</html>
+
+<!-- Event snippet for CV conversion page -->
+<script>
+  gtag('event', 'conversion', {'send_to': 'AW-16657649839/GvchCJqYysYZEK-h_oY-'});
+</script>

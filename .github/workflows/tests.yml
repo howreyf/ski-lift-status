@@ -1,0 +1,24 @@
+# Checks the parsers still read their saved pages whenever code is pushed.
+# (Doesn't download anything from the resorts.)
+
+name: Tests
+
+on:
+  push:
+    paths-ignore:
+      - "docs/data/**"   # the daily data commits don't need testing
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m unittest -v

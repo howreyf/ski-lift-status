@@ -1,0 +1,67 @@
+# Runs the scraper every morning and commits the new data, which updates the website.
+#
+# In season (months set in resorts.yaml): scrapes all resorts and commits the results.
+# Off season: scrapes nothing, but once a month commits a small check-in to
+# docs/data/lifts.json. That commit keeps the repository "active"; GitHub switches off
+# scheduled workflows in public repositories with no activity for 60 days.
+#
+# To run it by hand: GitHub -> Actions -> "Daily lift scrape" -> "Run workflow".
+
+name: Daily lift scrape
+
+on:
+  schedule:
+    # 00:30 UTC = 09:30 Japan time (GitHub schedules are in UTC; Japan is UTC+9).
+    # GitHub can start scheduled runs a few minutes late at busy times.
+    - cron: "30 0 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Scrape even outside the season months"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write  # needed to commit the data
+
+concurrency:
+  group: scrape    # never run two at once
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install packages
+        run: pip install -r requirements.txt
+
+      - name: Install browser (only if a resort uses fetch: browser)
+        run: |
+          if grep -q "fetch: *browser" resorts.yaml; then
+            python -m playwright install --with-deps chromium
+          else
+            echo "No resort needs a browser; skipping."
+          fi
+
+      - name: Scrape
+        run: python -m scraper.run ${{ inputs.force && '--force' || '' }}
+
+      - name: Commit new data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/data
+          if git diff --cached --quiet; then
+            echo "Nothing changed."
+            exit 0
+          fi
+          git commit -m "Lift data $(TZ=Asia/Tokyo date +%Y-%m-%d)"
+          git push
