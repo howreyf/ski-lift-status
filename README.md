@@ -36,7 +36,8 @@ Plain HTML/CSS/JavaScript, no build step. Pages (the part after `#` in the addre
 |---|---|---|
 | Home | `#/` | "Find resort" search, pinned resorts (up to 5), resort table grouped by region (collapsible) |
 | Resorts | `#/resorts` | Search and a directory of all resorts by region |
-| One resort | `#/resort/<id>` | Placeholder page for now: today's numbers, live summit/base temperature, lifts and runs |
+| One resort | `#/resort/<id>` | Boxes (lifts, runs, snow depth, new snow, base and summit temperature), lifts and runs lists, trail map |
+| One resort, past day | `#/resort/<id>/<YYYY-MM-DD>` | The same for a historical record (final temperatures, day's mean vs season) |
 
 - Table columns: lifts open / total · runs open by grade (green, red, black, orange = expert,
   grey = level not published; partly open counts as open; two-level runs count under the harder
@@ -74,12 +75,15 @@ file for the date being viewed.
 last_updated                       when lift data was last scraped
 last_checked                       when the scraper last ran (includes off-season monthly check-ins)
 season_months                      {start, end}, copied from resorts.yaml
-resorts.<id>                       name, region, source_url, location {lat, lon}, elevation_m {summit, base}
+resorts.<id>                       name, region, source_url, website, map {type, url, note},
+                                   location {lat, lon}, elevation_m {summit, base}
 seasons.<2026-27>.file             "seasons/2026-27.json"
 seasons.<2026-27>.dates            every date recorded that season
 seasons.<2026-27>.summary.<id>     lifts_total, runs_total, snow_depth_max_cm, snow_depth_max_date,
                                    summit_min_c, summit_max_c, base_min_c, base_max_c (season range
-                                   from the FINAL daily lows/highs), days_recorded
+                                   from the FINAL daily lows/highs), summit_lowest_mean_c,
+                                   summit_highest_mean_c, base_lowest_mean_c, base_highest_mean_c,
+                                   new_snow_min_cm, new_snow_max_cm, new_snow_mean_cm, days_recorded
 ```
 
 `docs/data/seasons/2026-27.json` (one per season, written on one line to keep it small):
@@ -88,10 +92,13 @@ season                             "2026-27" (seasons run July–June, so Nov–
 days[].date                        Japan date, e.g. 2026-11-27
 days[].results.<id>                scraped_at, ok, error (if failed), source_updated, lifts_open, runs_open,
                                    snow_depth_cm, new_snow_cm, temperature_c (the resort's own reading),
-                                   temps, lifts[], runs[]
+                                   temps, snow_outlook (today only), lifts[], runs[]
 days[].results.<id>.temps          kind ("forecast" for today, "final" once the day is over),
-                                   summit {elevation_m, min_c, max_c}, base {elevation_m, min_c, max_c},
-                                   hourly {summit: [24], base: [24]} (final days only)
+                                   summit {elevation_m, min_c, max_c, mean_c}, base {...},
+                                   snow_hours, snowed (final days only: hours of snow at the summit,
+                                   and whether that was 3 or more)
+days[].results.<id>.snow_outlook   {date, days, cm}: next day with >= 1 cm of snow forecast at the
+                                   summit (date null if none in 16 days); deleted once the day is over
 days[].results.<id>.lifts[]        name, name_en, status (open/closed/hold/unknown), raw, hours, lift_type
 days[].results.<id>.runs[]         name, name_en, status (open/partial/closed/unknown), raw, level
 ```
@@ -123,8 +130,11 @@ non-commercial use, credit shown in the website footer). Code: `scraper/weather.
 - The next morning that forecast is **replaced** by the day's **final** low/high
   (`temps.kind = "final"`); the forecast isn't kept. Runs look back 7 days, so a missed morning
   is filled in later, and on 1 May the off-season run still finalises 30 April.
-- With the final values, the day's **24 hourly temperatures** at summit and base are stored too
-  (`temps.hourly.summit` / `temps.hourly.base`, 00:00–23:00 Japan time).
+- Today's record also gets a **snow outlook**: the next day with at least 1 cm of snow forecast at
+  the summit (up to 16 days ahead), shown as "Next snow in N days". It's deleted once the day is over.
+- Final days also store the day's **mean** temperature and how many **hours it snowed** at the
+  summit (`snowed` = 3 hours or more). Hourly values themselves are not kept.
+- **Live** temperature and "is it snowing now" are fetched by the visitor's browser and never stored.
 - "Final" values are the weather model's best estimate of what happened (from observations and
   satellites), not a thermometer on the slope.
 - If Open-Meteo can't be reached, the run carries on without temperatures and catches up next time.

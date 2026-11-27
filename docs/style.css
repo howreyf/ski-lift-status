@@ -217,6 +217,127 @@ td.num { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .s-closed  { background: var(--closed-bg);  color: var(--closed-fg); }
 .s-unknown { background: var(--unknown-bg); color: var(--unknown-fg); }
 
+/* ---------------------------------------------------------------- resort page boxes */
+
+.resort-links { margin: 2px 0 10px; color: var(--muted); }
+.resort-links a { text-decoration: none; }
+.resort-links a:hover { text-decoration: underline; }
+.date-line { margin: 0 0 12px; }
+
+:root {
+  --fill-green: rgba(43, 138, 62, .13);
+  --fill-blue: rgba(31, 95, 174, .12);
+  --scale-track: #e3e7ee;
+  --scale-fill: #74a7e6;
+  --marker: #1c2430;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fill-green: rgba(143, 220, 166, .14);
+    --fill-blue: rgba(127, 176, 240, .14);
+    --scale-track: #2f3845;
+    --scale-fill: #4f86c9;
+    --marker: #e6eaf0;
+  }
+}
+
+.boxes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.box {
+  position: relative; overflow: hidden;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  min-height: 132px;
+}
+.box-fill { position: absolute; inset: 0 auto 0 0; transition: width .4s ease; }
+.fill-green .box-fill { background: var(--fill-green); border-right: 2px solid rgba(43, 138, 62, .35); }
+.fill-blue .box-fill { background: var(--fill-blue); border-right: 2px solid rgba(31, 95, 174, .35); }
+.box-body { position: relative; padding: 12px 14px; }
+.box-label { font-size: 13px; font-weight: 600; color: var(--muted); }
+.box-value { font-size: 28px; font-weight: 700; line-height: 1.2; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.box-value small { font-size: 16px; font-weight: 500; color: var(--muted); }
+.box-note { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.box-note strong { color: var(--text); }
+.box-outlook { color: var(--accent); font-weight: 600; }
+.box-grades { margin-top: 8px; }
+
+/* scale: a track with a marker (live temperature, new snow vs season) */
+.scale { margin-top: 10px; }
+.scale-track { position: relative; height: 8px; border-radius: 4px; background: var(--scale-track); }
+.scale-fill { position: absolute; top: 0; bottom: 0; border-radius: 4px; background: var(--scale-fill); }
+.scale-tick { position: absolute; top: -3px; width: 2px; height: 14px; margin-left: -1px; background: var(--muted); }
+.scale-marker {
+  position: absolute; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px;
+  border-radius: 50%; background: var(--marker); border: 2px solid var(--card);
+}
+.scale-marker.is-outside { background: var(--warn); }
+.scale-labels { display: flex; justify-content: space-between; gap: 6px; font-size: 11px; color: var(--muted); margin-top: 3px; }
+.scale-tick-label { font-weight: 600; }
+
+/* weather symbol in the new snow box */
+.box-snow .box-body { padding-right: 70px; }
+.wx { position: absolute; top: 10px; right: 10px; width: 52px; height: 52px; }
+.wx-sun { color: #f2b01e; display: flex; align-items: center; justify-content: center; }
+.wx-snow { border-radius: 50%; background: linear-gradient(#cfe0f5, #eef4fb); overflow: hidden; }
+@media (prefers-color-scheme: dark) { .wx-snow { background: linear-gradient(#24384f, #2f4660); } }
+.wx-snow span {
+  position: absolute; top: -6px; width: 5px; height: 5px; border-radius: 50%;
+  background: #fff; box-shadow: 0 0 2px rgba(0, 40, 90, .4);
+  animation: snowfall 2.6s linear infinite;
+}
+.wx-snow span:nth-child(1)  { left: 6%;  animation-delay: 0s; }
+.wx-snow span:nth-child(2)  { left: 20%; animation-delay: 1.1s; width: 4px; height: 4px; }
+.wx-snow span:nth-child(3)  { left: 34%; animation-delay: .5s; }
+.wx-snow span:nth-child(4)  { left: 48%; animation-delay: 1.8s; width: 6px; height: 6px; }
+.wx-snow span:nth-child(5)  { left: 62%; animation-delay: .2s; width: 4px; height: 4px; }
+.wx-snow span:nth-child(6)  { left: 76%; animation-delay: 1.4s; }
+.wx-snow span:nth-child(7)  { left: 88%; animation-delay: .8s; width: 4px; height: 4px; }
+.wx-snow span:nth-child(8)  { left: 13%; animation-delay: 2.1s; }
+.wx-snow span:nth-child(9)  { left: 27%; animation-delay: 1.6s; width: 6px; height: 6px; }
+.wx-snow span:nth-child(10) { left: 41%; animation-delay: 2.4s; width: 4px; height: 4px; }
+.wx-snow span:nth-child(11) { left: 55%; animation-delay: .9s; }
+.wx-snow span:nth-child(12) { left: 69%; animation-delay: 2.2s; width: 4px; height: 4px; }
+.wx-snow span:nth-child(13) { left: 82%; animation-delay: .4s; width: 6px; height: 6px; }
+.wx-snow span:nth-child(14) { left: 93%; animation-delay: 1.9s; }
+@keyframes snowfall {
+  0%   { transform: translate(0, 0); opacity: 0; }
+  10%  { opacity: 1; }
+  50%  { transform: translate(-4px, 30px); }
+  100% { transform: translate(3px, 62px); opacity: .9; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wx-snow span { animation: none; top: auto; }
+  .wx-snow span:nth-child(odd) { top: 30%; }
+  .wx-snow span:nth-child(even) { top: 62%; }
+}
+
+/* lift type and run difficulty */
+.type { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.type svg { color: var(--muted); flex: none; }
+.seats {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; padding: 0 4px; margin-left: -4px; border-radius: 9px;
+  background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 700;
+}
+.difficulty { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.dot { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+.dot.grade-black { box-shadow: inset 0 0 0 1px rgba(255,255,255,.35); }
+
+/* trail map */
+.map { margin-top: 20px; }
+.map h2 { font-size: 18px; margin: 0 0 8px; }
+.map img {
+  display: block; width: 100%; height: auto; max-height: 720px; object-fit: contain;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+}
+.map p { margin: 6px 0 0; }
+.button {
+  display: inline-block; padding: 9px 16px; border-radius: 10px;
+  background: var(--accent); color: var(--card); font-weight: 600; text-decoration: none;
+}
+.button:hover { filter: brightness(1.08); }
+
+@media (max-width: 900px) { .boxes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .boxes { grid-template-columns: 1fr; } }
+
 /* ---------------------------------------------------------------- toast and footer */
 
 .toast {

@@ -247,15 +247,18 @@ class TestSaving(unittest.TestCase):
 
     def test_season_summary(self):
         season = {"season": "2026-27", "days": []}
-        for date, depth, temp in [("2026-12-01", 50, -3), ("2026-12-02", 80, -10), ("2026-12-03", 80, 2)]:
-            store_result(season, date, "a", self.ok(depth, temp))
+        for date, depth, temp, new in [("2026-12-01", 50, -3, 0), ("2026-12-02", 80, -10, 15), ("2026-12-03", 80, 2, 4)]:
+            store_result(season, date, "a", dict(self.ok(depth, temp), new_snow_cm=new))
         summary = {}
         update_summary(summary, season, "a", self.ok(80, 2, n_lifts=7))
         self.assertEqual(summary, {
             "lifts_total": 7, "runs_total": 10,
             "snow_depth_max_cm": 80, "snow_depth_max_date": "2026-12-02",
-            # No daily low/high temperatures recorded in this test (see TestTemperatures).
+            # No daily temperatures recorded in this test (see TestTemperatures).
             "summit_min_c": None, "summit_max_c": None, "base_min_c": None, "base_max_c": None,
+            "summit_lowest_mean_c": None, "summit_highest_mean_c": None,
+            "base_lowest_mean_c": None, "base_highest_mean_c": None,
+            "new_snow_min_cm": 0, "new_snow_max_cm": 15, "new_snow_mean_cm": 6.3,
             "days_recorded": 3,
         })
 
@@ -307,24 +310,47 @@ class TestTemperatures(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_response(data[:1], points)
 
-    def test_hourly_temperatures_kept_for_final_days_only(self):
-        from scraper.weather import apply_temps, parse_response
+    def response(self):
+        """Fake Open-Meteo answer: 26 Nov (complete, snowed 4 h at summit), 27 Nov (today,
+        12 h so far), 28 Nov light snow, 29 Nov 5.3 cm."""
+        dates = ["2026-11-26", "2026-11-27", "2026-11-28", "2026-11-29"]
         hours = [f"2026-11-26T{h:02d}:00" for h in range(24)] + [f"2026-11-27T{h:02d}:00" for h in range(12)]
-        entry = lambda base: {
-            "daily": {"time": ["2026-11-26", "2026-11-27"], "temperature_2m_min": [base - 5, base - 4],
-                      "temperature_2m_max": [base + 5, base + 4]},
-            "hourly": {"time": hours, "temperature_2m": [base + i % 3 for i in range(len(hours))]},
+        entry = lambda base, snow_hours: {
+            "daily": {"time": dates, "temperature_2m_min": [base - 5] * 4, "temperature_2m_max": [base + 5] * 4,
+                      "temperature_2m_mean": [base - 0.04] * 4, "snowfall_sum": [2.0, 0.0, 0.4, 5.3]},
+            "hourly": {"time": hours, "snowfall": [0.5 if i < snow_hours else 0.0 for i in range(len(hours))]},
         }
-        out = parse_response([entry(-10), entry(-3)], [(self.RESORT, "summit"), (self.RESORT, "base")])
-        self.assertEqual(len(out["a"]["2026-11-26"]["hourly"]["summit"]), 24)
-        self.assertNotIn("hourly", out["a"]["2026-11-27"])  # only 12 hours so far: incomplete day
+        from scraper.weather import parse_response
+        return parse_response([entry(-10, 4), entry(-3, 1)], [(self.RESORT, "summit"), (self.RESORT, "base")])
+
+    def test_parse_snow_and_mean(self):
+        out = self.response()["a"]
+        self.assertEqual(out["2026-11-26"]["summit"], {"min_c": -15, "max_c": -5, "mean_c": -10.0})
+        self.assertEqual(out["2026-11-26"]["snow_hours"], {"summit": 4, "base": 1})
+        self.assertNotIn("snow_hours", out["2026-11-27"])  # only 12 hours so far: incomplete day
+        self.assertEqual(out["2026-11-29"]["snowfall_cm"]["summit"], 5.3)
+
+    def test_snow_outlook_today_and_final_day_snow_hours(self):
+        from scraper.weather import apply_temps, snow_outlook
+        out = self.response()["a"]
+        self.assertEqual(snow_outlook(out, "2026-11-27"), {"date": "2026-11-29", "days": 2, "cm": 5.3})  # 0.4 cm is too little
+        self.assertEqual(snow_outlook(out, "2026-11-30"), {"date": None, "days": None, "within_days": 16})
 
         season = self.season("2026-11-26", "2026-11-27")
-        apply_temps(season, self.RESORT, out["a"], today="2026-11-27")
-        final, forecast = (season["days"][i]["results"]["a"]["temps"] for i in (0, 1))
-        self.assertEqual(final["kind"], "final")
-        self.assertEqual(final["hourly"]["base"][:3], [-3, -2, -1])
-        self.assertNotIn("hourly", forecast)
+        season["days"][0]["results"]["a"]["snow_outlook"] = {"date": "2026-11-29", "days": 3, "cm": 5}  # yesterday's
+        apply_temps(season, self.RESORT, out, today="2026-11-27")
+        past, today = (season["days"][i]["results"]["a"] for i in (0, 1))
+        self.assertEqual((past["temps"]["kind"], past["temps"]["snow_hours"], past["temps"]["snowed"]), ("final", 4, True))
+        self.assertNotIn("snow_outlook", past)  # deleted once the day is over
+        self.assertEqual(today["temps"]["kind"], "forecast")
+        self.assertNotIn("snow_hours", today["temps"])
+        self.assertEqual(today["snow_outlook"]["days"], 2)
+
+    def test_less_than_three_hours_is_not_snowed(self):
+        from scraper.weather import temps_record
+        rec = temps_record("final", {"summit": {"min_c": 0, "max_c": 1}, "snow_hours": {"summit": 2}},
+                           {"summit": 1200, "base": 260})
+        self.assertEqual((rec["snow_hours"], rec["snowed"]), (2, False))
 
     def test_today_forecast_then_final_next_day(self):
         from scraper.weather import apply_temps

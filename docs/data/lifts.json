@@ -1,6 +1,6 @@
 {
- "last_updated": "2026-11-27T13:29:29+09:00",
- "last_checked": "2026-11-27T13:29:29+09:00",
+ "last_updated": "2026-11-27T15:24:36+09:00",
+ "last_checked": "2026-11-27T15:24:36+09:00",
  "season_months": {
   "start": 11,
   "end": 4
@@ -10,182 +10,255 @@
    "name": "Niseko Grand Hirafu",
    "region": "Hokkaido",
    "source_url": "https://www.grand-hirafu.jp/snow/status/",
-   "elevation_m": {
-    "summit": 1200,
-    "base": 260
+   "website": "https://en.grand-hirafu.jp/",
+   "map": {
+    "type": "image",
+    "url": "https://www.grand-hirafu.jp/snow/status/images/map.webp"
    },
    "location": {
     "lat": 42.862,
     "lon": 140.686
+   },
+   "elevation_m": {
+    "summit": 1200,
+    "base": 260
    }
   },
   "kiroro": {
    "name": "Kiroro",
    "region": "Hokkaido",
    "source_url": "https://www.kiroro.co.jp/dashboard/",
-   "elevation_m": {
-    "summit": 1180,
-    "base": 570
+   "website": "https://www.kiroro.co.jp/en/",
+   "map": {
+    "type": "page",
+    "url": "https://map.yukiyama-web.com/?id=392",
+    "note": "Interactive digital map"
    },
    "location": {
     "lat": 43.076,
     "lon": 140.986
+   },
+   "elevation_m": {
+    "summit": 1180,
+    "base": 570
    }
   },
   "rusutsu": {
    "name": "Rusutsu",
    "region": "Hokkaido",
    "source_url": "https://rusutsu.com/en/lift-and-trail-status/",
-   "elevation_m": {
-    "summit": 994,
-    "base": 400
+   "website": "https://rusutsu.com/en/",
+   "map": {
+    "type": "image",
+    "url": "https://rusutsu.com/assets/img/lift-and-trail-status/slope-map_en.png"
    },
    "location": {
     "lat": 42.75,
     "lon": 140.896
+   },
+   "elevation_m": {
+    "summit": 994,
+    "base": 400
    }
   },
   "furano": {
    "name": "Furano",
    "region": "Hokkaido",
    "source_url": "https://furapuri.com/ski/",
-   "elevation_m": {
-    "summit": 1074,
-    "base": 235
+   "website": "https://www.princehotels.com/en/ski/furano/",
+   "map": {
+    "type": "image",
+    "url": "https://furapuri.com/ski/map.svg",
+    "note": "Simplified map of the runs and lifts"
    },
    "location": {
     "lat": 43.327,
     "lon": 142.35
+   },
+   "elevation_m": {
+    "summit": 1074,
+    "base": 235
    }
   },
   "tomamu": {
    "name": "Tomamu",
    "region": "Hokkaido",
    "source_url": "https://www.snowtomamu.jp/winter/en/ski/ski-slope/condition/",
-   "elevation_m": {
-    "summit": 1171,
-    "base": 586
+   "website": "https://www.snowtomamu.jp/winter/en/",
+   "map": {
+    "type": "image",
+    "url": "https://www.snowtomamu.jp/assets/ski/images/map-bg-en.png"
    },
    "location": {
     "lat": 43.063,
     "lon": 142.625
+   },
+   "elevation_m": {
+    "summit": 1171,
+    "base": 586
    }
   },
   "sapporo-kokusai": {
    "name": "Sapporo Kokusai",
    "region": "Hokkaido",
    "source_url": "https://www.sapporo-kokusai.jp/en/slopes/",
-   "elevation_m": {
-    "summit": 1100,
-    "base": 630
+   "website": "https://www.sapporo-kokusai.jp/en/",
+   "map": {
+    "type": "image",
+    "url": "https://www.sapporo-kokusai.jp/en/slopes/images/slopemap.png"
    },
    "location": {
     "lat": 43.081,
     "lon": 141.096
+   },
+   "elevation_m": {
+    "summit": 1100,
+    "base": 630
    }
   },
   "sapporo-teine": {
    "name": "Sapporo Teine",
    "region": "Hokkaido",
    "source_url": "https://sapporo-teine.com/snow/gelande-report-en",
-   "elevation_m": {
-    "summit": 1023,
-    "base": 340
+   "website": "https://sapporo-teine.com/snow/lang/en/",
+   "map": {
+    "type": "image",
+    "url": "https://sapporo-teine.com/snow/wp-content/themes/teine-snow/images/greport/map-course.jpg"
    },
    "location": {
     "lat": 43.077,
     "lon": 141.195
+   },
+   "elevation_m": {
+    "summit": 1023,
+    "base": 340
    }
   },
   "shiga-kogen": {
    "name": "Shiga Kogen",
    "region": "Nagano",
    "source_url": "https://www.shigakogen.gr.jp/english/lift_information/",
-   "elevation_m": {
-    "summit": 2307,
-    "base": 1340
+   "website": "https://www.shigakogen.gr.jp/english/index.html",
+   "map": {
+    "type": "pdf",
+    "url": "https://shigakogen-ski.or.jp/assets/pdf/shigakogen_map_eng.pdf",
+    "note": "Shiga Kogen area map from the Shiga Kogen Ski Association"
    },
    "location": {
     "lat": 36.705,
     "lon": 138.508
+   },
+   "elevation_m": {
+    "summit": 2307,
+    "base": 1340
    }
   },
   "hakuba-goryu": {
    "name": "Hakuba Goryu",
    "region": "Nagano",
    "source_url": "http://hakubavalley.com/en/weather_en/",
-   "elevation_m": {
-    "summit": 1676,
-    "base": 750
+   "website": "https://www.s-goryu.com/",
+   "map": {
+    "type": "pdf",
+    "url": "https://www.hakubavalley.com/cms/wp-content/uploads/2025/11/25-26_日英並記.pdf"
    },
    "location": {
     "lat": 36.659,
     "lon": 137.822
+   },
+   "elevation_m": {
+    "summit": 1676,
+    "base": 750
    }
   },
   "hakuba-47": {
    "name": "Hakuba 47",
    "region": "Nagano",
    "source_url": "http://hakubavalley.com/en/weather_en/",
-   "elevation_m": {
-    "summit": 1614,
-    "base": 820
+   "website": "https://hakuba47.co.jp/",
+   "map": {
+    "type": "pdf",
+    "url": "https://www.hakubavalley.com/cms/wp-content/uploads/2026/01/25-26_47.pdf"
    },
    "location": {
     "lat": 36.666,
     "lon": 137.814
+   },
+   "elevation_m": {
+    "summit": 1614,
+    "base": 820
    }
   },
   "hakuba-happo-one": {
    "name": "Hakuba Happo-one",
    "region": "Nagano",
    "source_url": "http://hakubavalley.com/en/weather_en/",
-   "elevation_m": {
-    "summit": 1831,
-    "base": 760
+   "website": "https://www.happo-one.jp/",
+   "map": {
+    "type": "pdf",
+    "url": "https://www.hakubavalley.com/cms/wp-content/uploads/2025/11/2025-2026ゲレンデマップen-QR無し.pdf"
    },
    "location": {
     "lat": 36.698,
     "lon": 137.828
+   },
+   "elevation_m": {
+    "summit": 1831,
+    "base": 760
    }
   },
   "nozawa-onsen": {
    "name": "Nozawa Onsen",
    "region": "Nagano",
    "source_url": "https://en.nozawaski.com/the-mountain/moutain-info/slopes-lifts/",
-   "elevation_m": {
-    "summit": 1650,
-    "base": 565
+   "website": "https://en.nozawaski.com/",
+   "map": {
+    "type": "image",
+    "url": "https://nozawaski.com/cms/wp-content/themes/nozawa-ski/assets/img/gelande/gelandemap_base2025-26.jpg"
    },
    "location": {
     "lat": 36.921,
     "lon": 138.465
+   },
+   "elevation_m": {
+    "summit": 1650,
+    "base": 565
    }
   },
   "gala-yuzawa": {
    "name": "GALA Yuzawa",
    "region": "Niigata",
    "source_url": "https://gala.co.jp/winter/gelande/?wovn=en",
-   "elevation_m": {
-    "summit": 1181,
-    "base": 358
+   "website": "https://gala.co.jp/winter/?wovn=en",
+   "map": {
+    "type": "image",
+    "url": "https://gala.co.jp/winter/wp-content/themes/gala_winter/img/gelande/course_map.jpg"
    },
    "location": {
     "lat": 36.946,
     "lon": 138.795
+   },
+   "elevation_m": {
+    "summit": 1181,
+    "base": 358
    }
   },
   "zao-onsen": {
    "name": "Zao Onsen",
    "region": "Yamagata",
    "source_url": "https://zaomountainresort.com/ski/",
-   "elevation_m": {
-    "summit": 1661,
-    "base": 780
+   "website": "https://zaomountainresort.com/",
+   "map": {
+    "type": "image",
+    "url": "https://zaomountainresort.com/wp-content/uploads/2023/11/gmap2024_l.png"
    },
    "location": {
     "lat": 38.16,
     "lon": 140.42
+   },
+   "elevation_m": {
+    "summit": 1661,
+    "base": 780
    }
   }
  },
@@ -205,18 +278,32 @@
      "summit_min_c": null,
      "summit_max_c": null,
      "base_min_c": null,
-     "base_max_c": null
+     "base_max_c": null,
+     "summit_lowest_mean_c": null,
+     "summit_highest_mean_c": null,
+     "base_lowest_mean_c": null,
+     "base_highest_mean_c": null,
+     "new_snow_min_cm": 0,
+     "new_snow_max_cm": 0,
+     "new_snow_mean_cm": 0.0
     },
     "niseko-hirafu": {
      "lifts_total": 9,
      "runs_total": 22,
-     "snow_depth_max_cm": 130,
+     "snow_depth_max_cm": 110,
      "snow_depth_max_date": "2026-11-27",
      "days_recorded": 1,
      "summit_min_c": null,
      "summit_max_c": null,
      "base_min_c": null,
-     "base_max_c": null
+     "base_max_c": null,
+     "summit_lowest_mean_c": null,
+     "summit_highest_mean_c": null,
+     "base_lowest_mean_c": null,
+     "base_highest_mean_c": null,
+     "new_snow_min_cm": 0,
+     "new_snow_max_cm": 0,
+     "new_snow_mean_cm": 0.0
     },
     "kiroro": {
      "lifts_total": 9,
@@ -227,7 +314,14 @@
      "summit_min_c": null,
      "summit_max_c": null,
      "base_min_c": null,
-     "base_max_c": null
+     "base_max_c": null,
+     "summit_lowest_mean_c": null,
+     "summit_highest_mean_c": null,
+     "base_lowest_mean_c": null,
+     "base_highest_mean_c": null,
+     "new_snow_min_cm": 0,
+     "new_snow_max_cm": 0,
+     "new_snow_mean_cm": 0.0
     },
     "rusutsu": {
      "lifts_total": 18,
@@ -238,7 +332,14 @@
      "summit_min_c": null,
      "summit_max_c": null,
      "base_min_c": null,
-     "base_max_c": null
+     "base_max_c": null,
+     "summit_lowest_mean_c": null,
+     "summit_highest_mean_c": null,
+     "base_lowest_mean_c": null,
+     "base_highest_mean_c": null,
+     "new_snow_min_cm": null,
+     "new_snow_max_cm": null,
+     "new_snow_mean_cm": null
     },
     "furano": {
      "lifts_total": 11,
@@ -249,7 +350,14 @@
      "summit_min_c": null,
      "summit_max_c": null,
      "base_min_c": null,
-     "base_max_c": null
+     "base_max_c": null,
+     "summit_lowest_mean_c": null,
+     "summit_highest_mean_c": null,
+     "base_lowest_mean_c": null,
+     "base_highest_mean_c": null,
+     "new_snow_min_cm": 2,
+     "new_snow_max_cm": 2,
+     "new_snow_mean_cm": 2.0
     },
     "tomamu": {
      "lifts_total": 6,
@@ -260,7 +368,14 @@
      "summit_min_c": null,
      "summit_max_c": null,
      "base_min_c": null,
-     "base_max_c": null
+     "base_max_c": null,
+     "summit_lowest_mean_c": null,
+     "summit_highest_mean_c": null,
+     "base_lowest_mean_c": null,
+     "base_highest_mean_c": null,
+     "new_snow_min_cm": 0,
+     "new_snow_max_cm": 0,
+     "new_snow_mean_cm": 0.0
     },
     "sapporo-kokusai": {
      "lifts_total": 5,
@@ -271,7 +386,14 @@
      "summit_min_c": null,
      "summit_max_c": null,
      "base_min_c": null,
-     "base_max_c": null
+     "base_max_c": null,
+     "summit_lowest_mean_c": null,
+     "summit_highest_mean_c": null,
+     "base_lowest_mean_c": null,
+     "base_highest_mean_c": null,
+     "new_snow_min_cm": null,
+     "new_snow_max_cm": null,
+     "new_snow_mean_cm": null
     },
     "sapporo-teine": {
      "lifts_total": 10,
@@ -282,7 +404,14 @@
      "summit_min_c": null,
      "summit_max_c": null,
      "base_min_c": null,
-     "base_max_c": null
+     "base_max_c": null,
+     "summit_lowest_mean_c": null,
+     "summit_highest_mean_c": null,
+     "base_lowest_mean_c": null,
+     "base_highest_mean_c": null,
+     "new_snow_min_cm": 1,
+     "new_snow_max_cm": 1,
+     "new_snow_mean_cm": 1.0
     },
     "shiga-kogen": {
      "lifts_total": 49,
@@ -293,7 +422,14 @@
      "summit_min_c": null,
      "summit_max_c": null,
      "base_min_c": null,
-     "base_max_c": null
+     "base_max_c": null,
+     "summit_lowest_mean_c": null,
+     "summit_highest_mean_c": null,
+     "base_lowest_mean_c": null,
+     "base_highest_mean_c": null,
+     "new_snow_min_cm": 15,
+     "new_snow_max_cm": 15,
+     "new_snow_mean_cm": 15.0
     },
     "hakuba-goryu": {
      "lifts_total": 11,
@@ -304,7 +440,14 @@
      "summit_min_c": null,
      "summit_max_c": null,
      "base_min_c": null,
-     "base_max_c": null
+     "base_max_c": null,
+     "summit_lowest_mean_c": null,
+     "summit_highest_mean_c": null,
+     "base_lowest_mean_c": null,
+     "base_highest_mean_c": null,
+     "new_snow_min_cm": null,
+     "new_snow_max_cm": null,
+     "new_snow_mean_cm": null
     },
     "hakuba-47": {
      "lifts_total": 5,
@@ -315,7 +458,14 @@
      "summit_min_c": null,
      "summit_max_c": null,
      "base_min_c": null,
-     "base_max_c": null
+     "base_max_c": null,
+     "summit_lowest_mean_c": null,
+     "summit_highest_mean_c": null,
+     "base_lowest_mean_c": null,
+     "base_highest_mean_c": null,
+     "new_snow_min_cm": null,
+     "new_snow_max_cm": null,
+     "new_snow_mean_cm": null
     },
     "hakuba-happo-one": {
      "lifts_total": 19,
@@ -326,7 +476,14 @@
      "summit_min_c": null,
      "summit_max_c": null,
      "base_min_c": null,
-     "base_max_c": null
+     "base_max_c": null,
+     "summit_lowest_mean_c": null,
+     "summit_highest_mean_c": null,
+     "base_lowest_mean_c": null,
+     "base_highest_mean_c": null,
+     "new_snow_min_cm": null,
+     "new_snow_max_cm": null,
+     "new_snow_mean_cm": null
     },
     "nozawa-onsen": {
      "lifts_total": 16,
@@ -337,7 +494,14 @@
      "summit_min_c": null,
      "summit_max_c": null,
      "base_min_c": null,
-     "base_max_c": null
+     "base_max_c": null,
+     "summit_lowest_mean_c": null,
+     "summit_highest_mean_c": null,
+     "base_lowest_mean_c": null,
+     "base_highest_mean_c": null,
+     "new_snow_min_cm": null,
+     "new_snow_max_cm": null,
+     "new_snow_mean_cm": null
     },
     "gala-yuzawa": {
      "lifts_total": 10,
@@ -348,7 +512,14 @@
      "summit_min_c": null,
      "summit_max_c": null,
      "base_min_c": null,
-     "base_max_c": null
+     "base_max_c": null,
+     "summit_lowest_mean_c": null,
+     "summit_highest_mean_c": null,
+     "base_lowest_mean_c": null,
+     "base_highest_mean_c": null,
+     "new_snow_min_cm": null,
+     "new_snow_max_cm": null,
+     "new_snow_mean_cm": null
     }
    }
   }

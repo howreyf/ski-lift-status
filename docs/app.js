@@ -3,7 +3,8 @@
 // Pages (the part of the address after #):
 //   #/                 Home: find-resort search, pinned resorts, resort table by region
 //   #/resorts          Resorts: search + directory of all resorts by region
-//   #/resort/<id>      One resort (placeholder for now, with today's lifts and runs)
+//   #/resort/<id>      One resort: boxes (lifts, runs, snow, temperatures), lifts and runs, trail map
+//   #/resort/<id>/<date>  The same resort on a past day (historical record)
 //
 // Data: data/lifts.json (index) + data/seasons/<season>.json (daily records).
 // Live temperatures come straight from Open-Meteo in the visitor's browser.
@@ -171,7 +172,7 @@ async function fetchLive() {
     latitude: points.map(p => p.info.location.lat).join(","),
     longitude: points.map(p => p.info.location.lon).join(","),
     elevation: points.map(p => p.info.elevation_m[p.level]).join(","),
-    current: "temperature_2m",
+    current: "temperature_2m,snowfall,weather_code",
     timezone: "Asia/Tokyo",
   });
   try {
@@ -183,7 +184,7 @@ async function fetchLive() {
     points.forEach((p, i) => {
       const cur = data[i]?.current;
       if (cur && cur.temperature_2m !== null && cur.temperature_2m !== undefined) {
-        (live[p.id] ||= {})[p.level] = { temp: cur.temperature_2m + 0, time: cur.time };
+        (live[p.id] ||= {})[p.level] = { temp: cur.temperature_2m + 0, snowfall: cur.snowfall ?? 0, code: cur.weather_code, time: cur.time };
       }
     });
     state.live = live;
@@ -192,9 +193,7 @@ async function fetchLive() {
   }
   // Update temperature cells in place (re-rendering would interrupt typing in the search box).
   document.querySelectorAll("[data-base-temp]").forEach(el => { el.innerHTML = baseTempHtml(el.dataset.baseTemp); });
-  document.querySelectorAll("[data-live-level]").forEach(el => {
-    el.innerHTML = liveStatHtml(el.dataset.liveId, el.dataset.liveLevel);
-  });
+  refreshLiveBoxes();
 }
 
 /** Base temperature for the table: live if we have it, otherwise today's forecast low / high. */
@@ -470,72 +469,234 @@ function renderDirectory() {
   setupSearch(view);
 }
 
-function liveStatHtml(id, level) {
-  const live = state.live[id]?.[level];
-  const elevation = state.index.resorts[id].elevation_m?.[level];
-  const label = `${level === "summit" ? "Summit" : "Base"}${elevation ? ` ${Number(elevation).toLocaleString("en-GB")} m` : ""}`;
-  const t = todayResult(id)?.temps?.[level];
-  const range = t ? `<div class="stat-note">${todayResult(id).temps.kind === "forecast" ? "forecast" : "day"}: ${deg(t.min_c)} to ${deg(t.max_c)} °C</div>` : "";
-  const value = live ? `${deg(live.temp)} <small>°C</small><div class="stat-note">live</div>` : NA;
-  return `<div class="label">${esc(label)}</div><div class="value">${value}</div>${range}`;
+// ------------------------------------------------------------------ resort page
+
+// Which resort page is showing (so live updates can refresh its boxes).
+let currentPage = null; // {id, date, result, isLatest}
+
+const SNOW_CODES = [71, 73, 75, 77, 85, 86]; // Open-Meteo weather codes for snow
+const TYPE_LABEL = { Gondola: "Gondola", Ropeway: "Ropeway", "Magic carpet": "Magic carpet",
+  Single: "Single chair", Pair: "Pair chair", Triple: "Triple chair", Quad: "Quad chair", Six: "Six chair" };
+const SEATS = { Single: 1, Pair: 2, Triple: 3, Quad: 4, Six: 6 };
+const LEVEL_GRADE = { "First timer": ["green"], Beginner: ["green"], Intermediate: ["red"], Advanced: ["black"],
+  Expert: ["orange"], "Beginner/Intermediate": ["green", "red"], "Intermediate/Advanced": ["red", "black"] };
+
+function pct(part, whole) {
+  if (part == null || !whole) return null;
+  return Math.max(0, Math.min(100, (part / whole) * 100));
 }
 
-function renderResortPage(id) {
-  const info = state.index.resorts[id];
-  if (!info) {
-    view.innerHTML = `<p class="error">There's no resort called “${esc(id)}”.</p><p><a href="#/resorts">See all resorts</a></p>`;
-    return;
-  }
-  recent.add(id);
-  const r = todayResult(id);
-  const summary = seasonSummary(id);
-  view.innerHTML = `
-    <nav class="breadcrumb" aria-label="Breadcrumb"><a href="#/resorts">Resorts</a> › <span>${esc(info.name)}</span></nav>
-    <div class="resort-head">
-      <div>
-        <h1 class="page-title">${esc(info.name)}</h1>
-        <p class="muted">${esc(info.region)} · <a href="${esc(info.source_url)}" target="_blank" rel="noopener">resort's lift status page</a></p>
+/** A box; `fill` (0-100) fills the box from the left like a progress bar. */
+function box(key, label, inner, fill = null, extraClass = "") {
+  return `
+    <div class="box ${extraClass}" data-box="${key}">
+      ${fill > 0 ? `<div class="box-fill" style="width:${fill.toFixed(1)}%"></div>` : ""}
+      <div class="box-body"><div class="box-label">${label}</div>${inner}</div>
+    </div>`;
+}
+
+/** Horizontal scale from lo to hi with a marker at `value` (optional fill and a tick mark). */
+function scale({ lo, hi, value, fillFrom = null, tick = null, loLabel, hiLabel, valueLabel, tickLabel }) {
+  if (lo == null || hi == null || value == null) return "";
+  const span = hi - lo || 1;
+  const at = v => Math.max(0, Math.min(100, ((v - lo) / span) * 100));
+  const outside = value < lo ? "below" : value > hi ? "above" : "";
+  return `
+    <div class="scale" role="img" aria-label="${esc(valueLabel)} on a scale from ${esc(loLabel)} to ${esc(hiLabel)}">
+      <div class="scale-track">
+        ${fillFrom != null ? `<div class="scale-fill" style="left:${at(fillFrom)}%;width:${Math.max(0, at(value) - at(fillFrom))}%"></div>` : ""}
+        ${tick != null ? `<div class="scale-tick" style="left:${at(tick)}%" title="${esc(tickLabel)}"></div>` : ""}
+        <div class="scale-marker${outside ? " is-outside" : ""}" style="left:${at(value)}%"></div>
       </div>
-      <button class="pin pin-large${pins.has(id) ? " is-pinned" : ""}" type="button" data-pin="${esc(id)}"
-        aria-pressed="${pins.has(id)}">${pinIcon(pins.has(id))}<span>${pins.has(id) ? "Pinned" : "Pin"}</span></button>
-    </div>
+      <div class="scale-labels"><span>${esc(loLabel)}</span>${tickLabel ? `<span class="scale-tick-label">${esc(tickLabel)}</span>` : ""}<span>${esc(hiLabel)}</span></div>
+      ${outside ? `<div class="stat-note">${esc(valueLabel)} is ${outside} this range</div>` : ""}
+    </div>`;
+}
 
-    <div class="placeholder">
-      <strong>This resort page is a placeholder.</strong> The full design is coming soon; for now it shows today's data.
-    </div>
+function liftsBox(id, r) {
+  if (!r?.ok) return box("lifts", "Lifts open", `<div class="box-value">${NA}</div>`);
+  const total = (r.date === state.latestDate ? seasonSummary(id).lifts_total : null) ?? r.lifts.length;
+  const p = pct(r.lifts_open, total);
+  return box("lifts", "Lifts open",
+    `<div class="box-value">${r.lifts_open} <small>/ ${total}</small></div>
+     <div class="box-note">${Math.round(p)}% open</div>`, p, "fill-green");
+}
 
-    <div class="stats">
-      <div class="stat"><div class="label">Lifts open</div><div class="value">${liftsHtml(id, r)}</div></div>
-      <div class="stat"><div class="label">Runs open</div><div class="value">${runsHtml(r)}</div></div>
-      <div class="stat"><div class="label">Snow depth</div><div class="value">${r?.ok ? num(r.snow_depth_cm, " cm") : NA}</div></div>
-      <div class="stat"><div class="label">New snow</div><div class="value">${r?.ok ? num(r.new_snow_cm, " cm") : NA}</div></div>
-      <div class="stat" data-live-id="${esc(id)}" data-live-level="summit">${liveStatHtml(id, "summit")}</div>
-      <div class="stat" data-live-id="${esc(id)}" data-live-level="base">${liveStatHtml(id, "base")}</div>
-    </div>
-    <p class="muted small">Lift data for ${esc(formatDay(state.latestDate))}${r?.source_updated ? ` · resort last updated ${esc(formatJst(r.source_updated))}` : ""}
-      · season so far: summit ${summary.summit_min_c != null ? `${deg(summary.summit_min_c)} to ${deg(summary.summit_max_c)} °C` : NA},
-      base ${summary.base_min_c != null ? `${deg(summary.base_min_c)} to ${deg(summary.base_max_c)} °C` : NA}</p>
+function runsBox(id, r) {
+  const runs = r?.runs || [];
+  if (!r?.ok || !runs.length) {
+    return box("runs", "Runs open", `<div class="box-value">${NA}</div><div class="box-note">Not published by the resort</div>`);
+  }
+  const p = pct(r.runs_open, runs.length);
+  return box("runs", "Runs open",
+    `<div class="box-value">${r.runs_open} <small>/ ${runs.length}</small></div>
+     <div class="box-grades">${runsHtml(r)}</div>`, p, "fill-green");
+}
 
-    ${r?.ok ? liftsTable(r.lifts) + runsTable(r.runs || []) : `<p class="warn">${r ? "Couldn't read the resort's page today." : "No data for today."}</p>`}`;
+function snowDepthBox(id, r, date, isLatest) {
+  const depth = r?.ok ? r.snow_depth_cm : null;
+  const label = seasonOf(date);
+  let ref, refText;
+  if (isLatest) {
+    const start = Number(label.slice(0, 4)) - 1;
+    const prev = `${start}-${String((start + 1) % 100).padStart(2, "0")}`;
+    const lastMax = state.index.seasons[prev]?.summary?.[id]?.snow_depth_max_cm;
+    if (lastMax != null) {
+      ref = lastMax;
+      refText = `Last season's max: ${lastMax} cm`;
+    } else {
+      ref = state.index.seasons[label]?.summary?.[id]?.snow_depth_max_cm;
+      refText = `Last season's max: no records yet${ref != null ? ` (bar: this season's max so far, ${ref} cm)` : ""}`;
+    }
+  } else {
+    ref = state.index.seasons[label]?.summary?.[id]?.snow_depth_max_cm;
+    refText = `Season ${label} max: ${num(ref, " cm")}`;
+  }
+  const p = depth != null ? pct(depth, ref) : null;
+  return box("depth", "Snow depth",
+    `<div class="box-value">${num(depth, " cm")}</div><div class="box-note">${esc(refText)}</div>`, p, "fill-blue");
+}
 
-  view.querySelector("button[data-pin]").addEventListener("click", () => {
-    if (pins.toggle(id)) renderResortPage(id);
-  });
+function weatherIcon(snowing) {
+  if (snowing) {
+    return `<div class="wx wx-snow" role="img" aria-label="Snowing" title="Snowing">${"<span></span>".repeat(14)}</div>`;
+  }
+  const rays = [0, 45, 90, 135, 180, 225, 270, 315].map(a =>
+    `<line x1="24" y1="5" x2="24" y2="11" stroke="currentColor" stroke-width="3" stroke-linecap="round" transform="rotate(${a} 24 24)"/>`).join("");
+  return `<div class="wx wx-sun" role="img" aria-label="Not snowing" title="Not snowing"><svg viewBox="0 0 48 48" width="44" height="44" aria-hidden="true">
+    <circle cx="24" cy="24" r="9" fill="currentColor"/>${rays}</svg></div>`;
+}
+
+function outlookText(o) {
+  if (!o) return "";
+  if (o.date == null) return `No snow in the ${o.within_days}-day forecast`;
+  if (o.days === 0) return `Snow expected today (~${o.cm} cm)`;
+  const when = new Date(`${o.date}T12:00:00+09:00`).toLocaleDateString("en-GB", { timeZone: "Asia/Tokyo", weekday: "short", day: "numeric", month: "short" });
+  return `Next snow in ${o.days} day${o.days === 1 ? "" : "s"} (${when}, ~${o.cm} cm)`;
+}
+
+function newSnowBox(id, r, date, isLatest) {
+  const value = r?.ok ? r.new_snow_cm : null;
+  const t = r?.temps;
+  let snowing = false, wxNote = "";
+  if (isLatest) {
+    const live = state.live[id]?.summit;
+    if (live) {
+      snowing = live.snowfall > 0 || SNOW_CODES.includes(live.code);
+      wxNote = snowing ? "Snowing at the summit now" : "Not snowing at the summit now";
+    }
+  } else if (t?.snow_hours != null) {
+    snowing = !!t.snowed;
+    wxNote = `Snowed ${t.snow_hours} hour${t.snow_hours === 1 ? "" : "s"} at the summit that day`;
+  }
+  const outlook = isLatest && (value === 0 || value == null) ? outlookText(r?.snow_outlook) : "";
+  const s = state.index.seasons[seasonOf(date)]?.summary?.[id] || {};
+  let graphic = "";
+  if (value != null) {
+    graphic = s.new_snow_max_cm != null && s.new_snow_max_cm > s.new_snow_min_cm
+      ? scale({ lo: s.new_snow_min_cm, hi: s.new_snow_max_cm, value, fillFrom: s.new_snow_min_cm, tick: s.new_snow_mean_cm,
+          loLabel: `min ${s.new_snow_min_cm}`, hiLabel: `max ${s.new_snow_max_cm} cm`, valueLabel: `${value} cm`,
+          tickLabel: `mean ${s.new_snow_mean_cm}` })
+      : `<div class="stat-note">Compared with the season's min, mean and max new snow once there are a few days of records.</div>`;
+  }
+  return box("snow", "New snow",
+    `${weatherIcon(snowing)}
+     <div class="box-value">${num(value, " cm")}</div>
+     ${outlook ? `<div class="box-note box-outlook">${esc(outlook)}</div>` : ""}
+     ${wxNote ? `<div class="box-note">${esc(wxNote)}</div>` : ""}
+     ${graphic}`, null, "box-snow");
+}
+
+function tempBox(id, level, r, date, isLatest) {
+  const info = state.index.resorts[id];
+  const t = r?.temps?.[level];
+  const elevation = t?.elevation_m ?? info.elevation_m?.[level];
+  const title = `${level === "summit" ? "Summit" : "Base"} at ${elevation ? `${Number(elevation).toLocaleString("en-GB")} m` : NA}`;
+  if (!t) return box(level, title, `<div class="box-value">${NA}</div>`);
+  const kind = r.temps.kind === "forecast" ? "forecast min / max" : "min / max";
+  let below = "";
+  if (isLatest) {
+    const live = state.live[id]?.[level];
+    below = live
+      ? `<div class="box-note">Live: <strong>${deg(live.temp)} °C</strong></div>
+         ${scale({ lo: t.min_c, hi: t.max_c, value: live.temp, loLabel: `${deg(t.min_c)}°`, hiLabel: `${deg(t.max_c)}°`,
+                   valueLabel: `Live ${deg(live.temp)} °C` })}`
+      : `<div class="box-note">Live: loading…</div>`;
+  } else if (t.mean_c != null) {
+    const s = state.index.seasons[seasonOf(date)]?.summary?.[id] || {};
+    const lowest = s[`${level}_lowest_mean_c`], highest = s[`${level}_highest_mean_c`];
+    below = `<div class="box-note">Day's mean: <strong>${deg(t.mean_c)} °C</strong>${lowest != null ? ` · season's lowest mean ${deg(lowest)} °C` : ""}</div>
+      ${lowest != null && highest != null && highest > lowest
+        ? scale({ lo: lowest, hi: highest, value: t.mean_c, loLabel: `lowest mean ${deg(lowest)}°`, hiLabel: `highest ${deg(highest)}°`,
+                  valueLabel: `Mean ${deg(t.mean_c)} °C` })
+        : ""}`;
+  }
+  return box(level, title,
+    `<div class="box-value">${deg(t.min_c)} <small>/</small> ${deg(t.max_c)} <small>°C</small></div>
+     <div class="box-note">${kind}</div>${below}`);
+}
+
+function boxesHtml(id, r, date, isLatest) {
+  return liftsBox(id, r) + runsBox(id, r) + snowDepthBox(id, r, date, isLatest)
+    + newSnowBox(id, r, date, isLatest) + tempBox(id, "base", r, date, isLatest) + tempBox(id, "summit", r, date, isLatest);
+}
+
+/** After live data arrives, redraw only the boxes that use it. */
+function refreshLiveBoxes() {
+  if (!currentPage?.isLatest) return;
+  const { id, date, result } = currentPage;
+  const redraw = {
+    snow: () => newSnowBox(id, result, date, true),
+    base: () => tempBox(id, "base", result, date, true),
+    summit: () => tempBox(id, "summit", result, date, true),
+  };
+  for (const [key, html] of Object.entries(redraw)) {
+    const el = view.querySelector(`[data-box="${key}"]`);
+    if (el) el.outerHTML = html();
+  }
+}
+
+function typeIcon(type) {
+  const seats = SEATS[type];
+  let svg;
+  if (type === "Gondola") {
+    svg = `<path d="M3 5l18-2M12 4v4" stroke="currentColor" stroke-width="1.6"/>
+      <rect x="6" y="8" width="12" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6 12h12" stroke="currentColor" stroke-width="1.6"/>`;
+  } else if (type === "Ropeway") {
+    svg = `<path d="M2 5l20-2M2 7l20-2" stroke="currentColor" stroke-width="1.4"/><path d="M12 6v3" stroke="currentColor" stroke-width="1.6"/>
+      <rect x="4" y="9" width="16" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M4 13h16M9 13v7M15 13v7" stroke="currentColor" stroke-width="1.4"/>`;
+  } else if (type === "Magic carpet") {
+    svg = `<path d="M3 18l18-6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+      <circle cx="12" cy="7" r="2" fill="currentColor"/><path d="M12 9v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>`;
+  } else if (seats) {
+    svg = `<path d="M12 2v6" stroke="currentColor" stroke-width="1.6"/><path d="M7 8h10v6H7z" fill="none" stroke="currentColor" stroke-width="1.6"/>
+      <path d="M6 14h12l-1 4H7z" fill="currentColor"/><path d="M7 18v3M17 18v3" stroke="currentColor" stroke-width="1.6"/>`;
+  } else {
+    return `<span class="muted">${NA}</span>`;
+  }
+  return `<span class="type"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">${svg}</svg>${
+    seats ? `<span class="seats" title="${seats}-seat">${seats}</span>` : ""}<span>${esc(TYPE_LABEL[type] || type)}</span></span>`;
+}
+
+function difficultyHtml(level) {
+  const grades = LEVEL_GRADE[level];
+  if (!grades) return `<span class="muted">${NA}</span>`;
+  return `<span class="difficulty">${grades.map(g => `<span class="dot grade-${g}"></span>`).join("")}${esc(level)}</span>`;
 }
 
 function liftsTable(lifts) {
+  const open = lifts.filter(l => l.status === "open").length;
   return `
-    <details class="detail-table" open>
-      <summary>Lifts (${lifts.length})</summary>
+    <details class="detail-table">
+      <summary>Lifts <span class="muted">· ${open} of ${lifts.length} open</span></summary>
       <table>
-        <thead><tr><th>Lift</th><th>Status</th><th>Hours</th><th class="hide-sm">Type</th><th class="hide-sm">Resort's wording</th></tr></thead>
+        <thead><tr><th>Lift</th><th>Status</th><th>Operating hours</th><th>Type</th></tr></thead>
         <tbody>${lifts.map(l => `
           <tr>
             <td>${esc(l.name_en)}${l.name !== l.name_en ? `<span class="cell-note" lang="ja">${esc(l.name)}</span>` : ""}</td>
-            <td><span class="badge s-${esc(l.status)}">${esc(STATUS_LABEL[l.status])}</span></td>
+            <td><span class="badge s-${esc(l.status)}" title="Resort's wording: ${esc(l.raw)}">${esc(STATUS_LABEL[l.status])}</span></td>
             <td class="num">${esc(l.hours)}</td>
-            <td class="hide-sm">${esc(l.lift_type)}</td>
-            <td class="hide-sm muted small" lang="ja">${esc(l.raw)}</td>
+            <td>${typeIcon(l.lift_type)}</td>
           </tr>`).join("")}</tbody>
       </table>
     </details>`;
@@ -543,33 +704,107 @@ function liftsTable(lifts) {
 
 function runsTable(runs) {
   if (!runs.length) return `<p class="muted small">Runs: ${NA} (the resort doesn't publish run status).</p>`;
+  const open = runs.filter(x => x.status === "open" || x.status === "partial").length;
   return `
     <details class="detail-table">
-      <summary>Runs (${runs.length})</summary>
+      <summary>Runs <span class="muted">· ${open} of ${runs.length} open</span></summary>
       <table>
-        <thead><tr><th>Run</th><th>Status</th><th>Level</th><th class="hide-sm">Resort's wording</th></tr></thead>
+        <thead><tr><th>Run</th><th>Status</th><th>Difficulty</th></tr></thead>
         <tbody>${runs.map(x => `
           <tr>
             <td>${esc(x.name_en)}${x.name !== x.name_en ? `<span class="cell-note" lang="ja">${esc(x.name)}</span>` : ""}</td>
-            <td><span class="badge s-${esc(x.status)}">${esc(RUN_STATUS_LABEL[x.status])}</span></td>
-            <td>${esc(x.level)}</td>
-            <td class="hide-sm muted small" lang="ja">${esc(x.raw)}</td>
+            <td><span class="badge s-${esc(x.status)}" title="Resort's wording: ${esc(x.raw)}">${esc(RUN_STATUS_LABEL[x.status])}</span></td>
+            <td>${difficultyHtml(x.level)}</td>
           </tr>`).join("")}</tbody>
       </table>
     </details>`;
+}
+
+function mapHtml(info) {
+  const m = info.map;
+  if (!m?.url) return "";
+  const note = m.note ? `<p class="muted small">${esc(m.note)}.</p>` : "";
+  const credit = `<p class="muted small">Map © ${esc(info.name)}, from the resort's website.</p>`;
+  if (m.type === "image") {
+    return `
+      <section class="map">
+        <h2>Trail map</h2>
+        <a href="${esc(m.url)}" target="_blank" rel="noopener" title="Open full size">
+          <img src="${esc(m.url)}" alt="Trail map of ${esc(info.name)}" loading="lazy">
+        </a>
+        ${note}${credit}
+      </section>`;
+  }
+  const what = m.type === "pdf" ? "Open the trail map (PDF)" : "Open the trail map";
+  return `
+    <section class="map">
+      <h2>Trail map</h2>
+      <p><a class="button" href="${esc(m.url)}" target="_blank" rel="noopener">${what} ↗</a></p>
+      ${note}${credit}
+    </section>`;
+}
+
+async function renderResortPage(id, date) {
+  const info = state.index.resorts[id];
+  if (!info) {
+    view.innerHTML = `<p class="error">There's no resort called “${esc(id)}”.</p><p><a href="#/resorts">See all resorts</a></p>`;
+    return;
+  }
+  recent.add(id);
+  date = date || state.latestDate;
+  const isLatest = date === state.latestDate;
+  let day = state.latestDay;
+  if (!isLatest) {
+    try {
+      const season = await loadSeason(seasonOf(date));
+      day = season.days.find(d => d.date === date);
+    } catch {
+      day = null;
+    }
+  }
+  const r = day?.results?.[id];
+  if (r) r.date = date;
+  currentPage = { id, date, result: r, isLatest };
+
+  view.innerHTML = `
+    <nav class="breadcrumb" aria-label="Breadcrumb"><a href="#/resorts">Resorts</a> › <span>${esc(info.name)}</span></nav>
+    <div class="resort-head">
+      <div>
+        <h1 class="page-title">${esc(info.name)}</h1>
+        <p class="resort-links small">
+          ${info.website ? `<a href="${esc(info.website)}" target="_blank" rel="noopener">Official website ↗</a> · ` : ""}
+          <a href="${esc(info.source_url)}" target="_blank" rel="noopener">Lift status page ↗</a> · ${esc(info.region)}
+        </p>
+      </div>
+      <button class="pin pin-large${pins.has(id) ? " is-pinned" : ""}" type="button" data-pin="${esc(id)}"
+        aria-pressed="${pins.has(id)}">${pinIcon(pins.has(id))}<span>${pins.has(id) ? "Pinned" : "Pin"}</span></button>
+    </div>
+    <p class="muted small date-line">${isLatest ? "Latest data" : "Historical record"}: <strong>${esc(formatDay(date))}</strong>${
+      r?.source_updated ? ` · resort last updated ${esc(formatJst(r.source_updated))}` : ""}</p>
+
+    ${!r ? `<p class="warn">No data for this day.</p>` : !r.ok ? `<p class="warn">Couldn't read the resort's page this day.</p>` : ""}
+    <div class="boxes">${boxesHtml(id, r, date, isLatest)}</div>
+
+    ${r?.ok ? liftsTable(r.lifts) + runsTable(r.runs || []) : ""}
+    ${mapHtml(info)}`;
+
+  view.querySelector("button[data-pin]").addEventListener("click", () => {
+    if (pins.toggle(id)) renderResortPage(id, isLatest ? null : date);
+  });
 }
 
 // ------------------------------------------------------------------ router
 
 function route() {
   const path = location.hash.replace(/^#\/?/, "");
-  const [page, id] = path.split("/");
+  const [page, id, date] = path.split("/");
   const tab = page === "resorts" || page === "resort" ? "resorts" : "home";
   document.querySelectorAll(".tabs a").forEach(a => {
     if (a.dataset.tab === tab) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");
   });
-  if (page === "resort" && id) renderResortPage(decodeURIComponent(id));
+  currentPage = null;
+  if (page === "resort" && id) renderResortPage(decodeURIComponent(id), /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : null);
   else if (page === "resorts") renderDirectory();
   else renderHome();
   window.scrollTo(0, 0);

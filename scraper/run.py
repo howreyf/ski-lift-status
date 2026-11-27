@@ -31,7 +31,7 @@ from pathlib import Path
 import yaml
 
 from scraper.common import RUN_STATUSES, STATUSES, fetch, now_jst
-from scraper.weather import LEVELS, PAST_DAYS, apply_temps, fetch_daily_temps, has_location
+from scraper.weather import LEVELS, PAST_DAYS, apply_temps, fetch_weather, has_location
 
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT / "resorts.yaml"
@@ -232,19 +232,29 @@ def update_summary(summary: dict, season: dict, resort_id: str, result: dict | N
     for level in LEVELS:
         lows = [t[level]["min_c"] for t in finals if level in t]
         highs = [t[level]["max_c"] for t in finals if level in t]
+        means = [t[level]["mean_c"] for t in finals if level in t and t[level].get("mean_c") is not None]
         summary[f"{level}_min_c"] = min(lows) if lows else None
         summary[f"{level}_max_c"] = max(highs) if highs else None
+        # Coldest and warmest daily MEAN of the season (website compares a past day's mean to these).
+        summary[f"{level}_lowest_mean_c"] = min(means) if means else None
+        summary[f"{level}_highest_mean_c"] = max(means) if means else None
     summary.pop("temperature_min_c", None)  # older format (morning readings), replaced by the above
     summary.pop("temperature_max_c", None)
+
+    # New snow reported by the resort: smallest, largest and average daily amount this season.
+    new = [r["new_snow_cm"] for _, r in days if r.get("new_snow_cm") is not None]
+    summary["new_snow_min_cm"] = min(new) if new else None
+    summary["new_snow_max_cm"] = max(new) if new else None
+    summary["new_snow_mean_cm"] = round(sum(new) / len(new), 1) if new else None
     summary["days_recorded"] = len(days)
 
 
 def update_weather(season: dict, resorts: list[dict], today: str) -> set[str]:
-    """Add today's forecast and yesterday's (and any missed day's) final temperatures.
-    Never fails the run: if Open-Meteo can't be reached, the next run catches up.
-    Returns the ids of resorts whose temperatures changed."""
+    """Add today's forecast and snow outlook, and yesterday's (and any missed day's) final
+    temperatures and snow hours. Never fails the run: if Open-Meteo can't be reached, the
+    next run catches up. Returns the ids of resorts whose weather changed."""
     try:
-        temps = fetch_daily_temps(resorts)
+        temps = fetch_weather(resorts)
     except Exception as e:
         print(f"Weather: couldn't get temperatures from Open-Meteo ({type(e).__name__}: {e}); "
               f"will catch up next run.")
@@ -343,6 +353,8 @@ def main(argv: list[str] | None = None) -> int:
             "name": resort["name"],
             "region": resort["region"],
             "source_url": resort["url"],
+            **({"website": resort["website"]} if resort.get("website") else {}),
+            **({"map": resort["map"]} if resort.get("map") else {}),
             # Position and heights: the website uses them to fetch live temperatures.
             **({"location": {"lat": resort["location"]["lat"], "lon": resort["location"]["lon"]},
                 "elevation_m": {level: resort["elevation"][level] for level in LEVELS}}

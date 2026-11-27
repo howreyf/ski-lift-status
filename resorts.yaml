@@ -13,6 +13,9 @@
 #   location  approximate centre of the ski area (for the Open-Meteo temperatures)
 #   elevation base and summit height in metres (lowest and highest lift-served points, from
 #             the resort's published figures); daily low/high temperatures are for these heights
+#   website   the resort's official website (linked under the name on its page)
+#   map       trail map shown at the bottom of its page: type image (shown on the page),
+#             pdf or page (linked); optional note shown under it
 
 # Months when lift data is collected (inclusive). Outside them the daily run only saves a
 # small monthly check-in, which keeps GitHub from switching the schedule off.
@@ -27,6 +30,8 @@ resorts:
     region: Hokkaido
     location: { lat: 42.862, lon: 140.686 }
     elevation: { base: 260, summit: 1200 }   # metres
+    website: https://en.grand-hirafu.jp/
+    map: { type: image, url: "https://www.grand-hirafu.jp/snow/status/images/map.webp" }
     url: https://www.grand-hirafu.jp/snow/status/
     parser: niseko
     enabled: true
@@ -36,6 +41,8 @@ resorts:
     region: Hokkaido
     location: { lat: 43.076, lon: 140.986 }
     elevation: { base: 570, summit: 1180 }   # metres
+    website: https://www.kiroro.co.jp/en/
+    map: { type: page, url: "https://map.yukiyama-web.com/?id=392", note: "Interactive digital map" }
     url: https://www.kiroro.co.jp/dashboard/
     parser: kiroro
     enabled: true
@@ -45,6 +52,8 @@ resorts:
     region: Hokkaido
     location: { lat: 42.75, lon: 140.896 }
     elevation: { base: 400, summit: 994 }   # metres
+    website: https://rusutsu.com/en/
+    map: { type: image, url: "https://rusutsu.com/assets/img/lift-and-trail-status/slope-map_en.png" }
     url: https://rusutsu.com/en/lift-and-trail-status/
     data_url: https://rusutsu.com/assets/partial/ajax/trail-and-lift/get-front.php
     parser: rusutsu
@@ -55,6 +64,8 @@ resorts:
     region: Hokkaido
     location: { lat: 43.327, lon: 142.35 }
     elevation: { base: 235, summit: 1074 }   # metres
+    website: https://www.princehotels.com/en/ski/furano/
+    map: { type: image, url: "https://furapuri.com/ski/map.svg", note: "Simplified map of the runs and lifts" }
     url: https://furapuri.com/ski/
     data_url: https://furapuri.com/ski/data.json
     parser: furano
@@ -65,6 +76,8 @@ resorts:
     region: Hokkaido
     location: { lat: 43.063, lon: 142.625 }
     elevation: { base: 586, summit: 1171 }   # metres
+    website: https://www.snowtomamu.jp/winter/en/
+    map: { type: image, url: "https://www.snowtomamu.jp/assets/ski/images/map-bg-en.png" }
     url: https://www.snowtomamu.jp/winter/en/ski/ski-slope/condition/
     parser: tomamu
     enabled: true
@@ -74,6 +87,8 @@ resorts:
     region: Hokkaido
     location: { lat: 43.081, lon: 141.096 }
     elevation: { base: 630, summit: 1100 }   # metres
+    website: https://www.sapporo-kokusai.jp/en/
+    map: { type: image, url: "https://www.sapporo-kokusai.jp/en/slopes/images/slopemap.png" }
     url: https://www.sapporo-kokusai.jp/en/slopes/
     parser: sapporo_kokusai
     enabled: true
@@ -83,6 +98,8 @@ resorts:
     region: Hokkaido
     location: { lat: 43.077, lon: 141.195 }
     elevation: { base: 340, summit: 1023 }   # metres
+    website: https://sapporo-teine.com/snow/lang/en/
+    map: { type: image, url: "https://sapporo-teine.com/snow/wp-content/themes/teine-snow/images/greport/map-course.jpg" }
     url: https://sapporo-teine.com/snow/gelande-report-en
     parser: sapporo_teine
     enabled: true
@@ -93,6 +110,8 @@ resorts:
     region: Nagano
     location: { lat: 36.705, lon: 138.508 }
     elevation: { base: 1340, summit: 2307 }   # metres
+    website: https://www.shigakogen.gr.jp/english/index.html
+    map: { type: pdf, url: "https://shigakogen-ski.or.jp/assets/pdf/shigakogen_map_eng.pdf", note: "Shiga Kogen area map from the Shiga Kogen Ski Association" }
     url: https://www.shigakogen.gr.jp/english/lift_information/
     parser: shiga_kogen
     enabled: true
@@ -102,6 +121,8 @@ resorts:
     region: Nagano
     location: { lat: 36.659, lon: 137.822 }
     elevation: { base: 750, summit: 1676 }   # metres
+    website: https://www.s-goryu.com/
+    map: { type: pdf, url: "https://www.hakubavalley.com/cms/wp-content/uploads/2025/11/25-26_日英並記.pdf" }
     url: http://hakubavalley.com/en/weather_en/
     parser: hakuba_valley
     options: { area: goryu }
@@ -112,6 +133,8 @@ resorts:
     region: Nagano
     location: { lat: 36.666, lon: 137.814 }
     elevation: { base: 820, summit: 1614 }   # metres
+    website: https://hakuba47.co.jp/
+    map: { type: pdf, url: "https://www.hakubavalley.com/cms/wp-content/uploads/2026/01/25-26_47.pdf" }
     url: http://hakubavalley.com/en/weather_en/
     parser: hakuba_valley
     options: { area: "47" }
@@ -122,6 +145,8 @@ resorts:
     region: Nagano
     location: { lat: 36.698, lon: 137.828 }
     elevation: { base: 760, summit: 1831 }   # metres
+    website: https://www.happo-one.jp/
+    map: { type: pdf, url: "https://www.hakubavalley.com/cms/wp-content/uploads/2025/11/2025-2026ゲレンデマップen-QR無し.pdf" }
     url: http://hakubavalley.com/en/weather_en/
     parser: hakuba_valley
     options: { area: happo-one }
@@ -132,6 +157,8 @@ resorts:
     region: Nagano
     location: { lat: 36.921, lon: 138.465 }
     elevation: { base: 565, summit: 1650 }   # metres
+    website: https://en.nozawaski.com/
+    map: { type: image, url: "https://nozawaski.com/cms/wp-content/themes/nozawa-ski/assets/img/gelande/gelandemap_base2025-26.jpg" }
     url: https://en.nozawaski.com/the-mountain/moutain-info/slopes-lifts/
     parser: nozawa
     enabled: true
@@ -142,6 +169,8 @@ resorts:
     region: Niigata
     location: { lat: 36.946, lon: 138.795 }
     elevation: { base: 358, summit: 1181 }   # metres
+    website: https://gala.co.jp/winter/?wovn=en
+    map: { type: image, url: "https://gala.co.jp/winter/wp-content/themes/gala_winter/img/gelande/course_map.jpg" }
     url: https://gala.co.jp/winter/gelande/?wovn=en
     parser: gala_yuzawa
     enabled: true
@@ -152,6 +181,8 @@ resorts:
     region: Yamagata
     location: { lat: 38.16, lon: 140.42 }
     elevation: { base: 780, summit: 1661 }   # metres
+    website: https://zaomountainresort.com/
+    map: { type: image, url: "https://zaomountainresort.com/wp-content/uploads/2023/11/gmap2024_l.png" }
     url: https://zaomountainresort.com/ski/
     parser: zao
     enabled: true
