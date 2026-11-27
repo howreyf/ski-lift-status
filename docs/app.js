@@ -186,7 +186,7 @@ function statusTimeHtml() {
   if (!ls?.updated) return "";
   const time = new Date(ls.updated).toLocaleTimeString("en-GB", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit" });
   const day = ls.date !== new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" }) ? ` ${formatDay(ls.date)}` : "";
-  return `Lift &amp; run status: last change <strong>${esc(time)} JST${esc(day)}</strong> (checked every 30 min, 07:00–21:00)`;
+  return `Lift &amp; run status: last change <strong>${esc(time)} JST${esc(day)}</strong> (checked every 30 min, 07:08–21:08)`;
 }
 
 function seasonSummary(id) {

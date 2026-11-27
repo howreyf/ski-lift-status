@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import time
 import unicodedata
 from datetime import datetime, timedelta, timezone
 
@@ -23,6 +24,29 @@ def now_jst() -> datetime:
 
 # ---------------------------------------------------------------- fetching
 
+RETRY_WAITS = (5, 15)  # seconds to wait before the 2nd and 3rd try
+
+
+def _get_with_retries(url: str, headers: dict) -> requests.Response:
+    """GET, retrying a couple of times when the site refuses the connection, times out or
+    has a server error (5xx). Sites sometimes hiccup, especially towards cloud servers like
+    GitHub's. Other errors (e.g. 404 page not found) aren't retried: they won't fix themselves."""
+    for attempt, wait in enumerate((0, *RETRY_WAITS)):
+        if wait:
+            print(f"  retrying in {wait}s ({type(last_error).__name__})")
+            time.sleep(wait)
+        try:
+            resp = requests.get(url, headers=headers, timeout=TIMEOUT_SECONDS)
+            if resp.status_code >= 500:
+                resp.raise_for_status()
+            return resp
+        except (requests.ConnectionError, requests.Timeout) as e:
+            last_error = e
+        except requests.HTTPError as e:
+            last_error = e
+    raise last_error
+
+
 def fetch(url: str, method: str = "html", referer: str | None = None) -> str:
     """Return the page text. method="browser" runs JavaScript via Playwright."""
     if method == "browser":
@@ -30,7 +54,7 @@ def fetch(url: str, method: str = "html", referer: str | None = None) -> str:
     headers = {"User-Agent": USER_AGENT}
     if referer:
         headers["Referer"] = referer
-    resp = requests.get(url, headers=headers, timeout=TIMEOUT_SECONDS)
+    resp = _get_with_retries(url, headers)
     resp.raise_for_status()
     # Servers that don't declare a charset default to ISO-8859-1, which garbles Japanese.
     if not resp.encoding or resp.encoding.lower() == "iso-8859-1":

@@ -378,6 +378,50 @@ class TestLive(unittest.TestCase):
         self.assertFalse(daily_due(season, "2026-12-02", "10:30", "09:30"))  # already written today
 
 
+class TestRetries(unittest.TestCase):
+    """fetch() retries refused connections, timeouts and server errors, but not 404s."""
+
+    def run_fetch(self, outcomes):
+        from unittest import mock
+        import requests
+        from scraper import common
+        calls = []
+
+        def fake_get(url, headers, timeout):
+            outcome = outcomes[len(calls)]
+            calls.append(url)
+            if isinstance(outcome, Exception):
+                raise outcome
+            resp = mock.Mock(status_code=outcome, text="<html>ok</html>", encoding="utf-8")
+            resp.raise_for_status = mock.Mock(side_effect=None if outcome < 400 else requests.HTTPError(f"{outcome}"))
+            return resp
+
+        with mock.patch.object(common.requests, "get", side_effect=fake_get), mock.patch.object(common.time, "sleep"):
+            try:
+                return common.fetch("https://example.test/"), len(calls)
+            except Exception as e:
+                return e, len(calls)
+
+    def test_retries_then_succeeds(self):
+        import requests
+        result, calls = self.run_fetch([requests.ConnectionError("refused"), requests.Timeout("slow"), 200])
+        self.assertEqual((result, calls), ("<html>ok</html>", 3))
+
+    def test_gives_up_after_three_tries(self):
+        import requests
+        result, calls = self.run_fetch([requests.ConnectionError("x")] * 3)
+        self.assertIsInstance(result, requests.ConnectionError)
+        self.assertEqual(calls, 3)
+
+    def test_server_error_retried_but_404_not(self):
+        import requests
+        result, calls = self.run_fetch([503, 200])
+        self.assertEqual((result, calls), ("<html>ok</html>", 2))
+        result, calls = self.run_fetch([404])
+        self.assertIsInstance(result, requests.HTTPError)
+        self.assertEqual(calls, 1)
+
+
 class TestSeasonMonths(unittest.TestCase):
     def test_in_season_across_new_year(self):
         self.assertEqual([m for m in range(1, 13) if in_season(m, 11, 4)], [1, 2, 3, 4, 11, 12])
