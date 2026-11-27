@@ -43,7 +43,7 @@ jobs:
       - name: Install packages
         run: pip install -r requirements.txt
 
-      - name: Install browser (only if a resort uses fetch: browser)
+      - name: "Install browser (only if a resort uses fetch: browser)"
         run: |
           if grep -q "fetch: *browser" resorts.yaml; then
             python -m playwright install --with-deps chromium
