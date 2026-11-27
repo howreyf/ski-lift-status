@@ -172,6 +172,13 @@ class TestSpecificLifts(unittest.TestCase):
         self.assertEqual((len(h47), sum(r["status"] == "open" for r in h47)), (23, 20))
         self.assertFalse(any("Night" in r["name"] or "Sunrise" in r["name"] for r in goryu))  # sessions skipped
         self.assertIn("Toomi Slope(Upper)", [r["name"] for r in goryu])                     # a real run, kept
+        names47 = [r["name"] for r in h47]
+        self.assertEqual(len(names47), len(set(names47)), "duplicate run names get numbered")
+        self.assertIn("Upper Route 7_B (2)", names47)
+        levels = {r["name"]: r["level"] for r in goryu + h47}
+        self.assertEqual((levels["Grand Prix"], levels["Champion Expert"], levels["Route 5"], levels["Upper Route 7"]),
+                         ("Intermediate", "Advanced", "Intermediate", "Beginner"))
+        self.assertEqual(levels["Champion Dynamic"], "N/A")  # no clear rating found
         with self.assertRaises(ValueError):
             parse_runs(html, {"runs_sections": ["no-such-section"]})
 

@@ -14,7 +14,7 @@ import re
 
 from bs4 import BeautifulSoup
 
-from scraper.common import clean_text, lift, run, to_jst_iso, to_number
+from scraper.common import clean_text, lift, run, to_jst_iso, to_number, unique_names
 
 SESSION_ROW = re.compile(r"\((night|sunrise)[^)]*\)\s*$", re.IGNORECASE)
 
@@ -66,6 +66,25 @@ def parse(html: str, options: dict) -> dict:
 
 HAPPO_ICONS = {"icon_circle": "open", "icon_triangle": "partial", "icon_cross": "closed"}
 
+# Goryu and Hakuba 47 publish no per-run difficulty. These few come from third-party ski
+# guides (SkiAsia, Powderhounds, Steep, SnowPak), not the resorts, and only where a run is
+# rated clearly; everything else stays N/A. Keys: names as the slope page writes them, lower case.
+GORYU_47_RUN_LEVELS = {
+    # Goryu
+    "toomi slope": "Beginner",
+    "panorama course": "Beginner",
+    "grand prix": "Intermediate",
+    "technical course": "Advanced",
+    "champion expert": "Advanced",
+    "adventure": "Advanced",
+    # Hakuba 47
+    "route 5": "Intermediate",
+    "upper route 7": "Beginner",
+    "lower route 7": "Beginner",
+    "tree riding zone (upper area)": "Advanced",
+    "tree riding zone (lower area)": "Advanced",
+}
+
 # Happo-one's trail status page has no difficulty; it's taken from its trail guide
 # (https://www.happo-one.jp/en/gelande/). Keys: trail names as the status page writes them,
 # lower case. Ranges in the guide become our two-level grades (counted under the harder one);
@@ -109,8 +128,8 @@ def parse_runs(html: str, options: dict) -> list[dict]:
             name = clean_text(tds[0].get_text())
             if SESSION_ROW.search(name):
                 continue
-            runs.append(run(name, tds[1].get_text()))
-    return runs
+            runs.append(run(name, tds[1].get_text(), level=GORYU_47_RUN_LEVELS.get(name.lower())))
+    return unique_names(runs)  # Hakuba 47 lists "Upper Route 7_B" twice
 
 
 def _happo_runs(html: str) -> list[dict]:
