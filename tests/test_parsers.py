@@ -139,6 +139,15 @@ class TestSpecificLifts(unittest.TestCase):
     def test_hakuba_skips_night_sessions(self):
         self.assertFalse(any("Night" in n for n in self.lifts["hakuba-goryu"]))
 
+    def test_teine_run_difficulty_from_course_guide(self):
+        from scraper.parsers import sapporo_teine
+        runs = sapporo_teine.parse((FIXTURES / "sapporo_teine.html").read_text(encoding="utf-8"), {})["runs"]
+        levels = {r["name"]: r["level"] for r in runs}
+        self.assertNotIn("N/A", levels.values(), "every Teine run should have a difficulty")
+        self.assertEqual(levels["KITAKABE"], "Expert")
+        self.assertEqual(levels["Natural"], "Beginner")
+        self.assertEqual(levels["Ocean Dive"], "Advanced")
+
     def test_hakuba_runs_from_the_slope_conditions_page(self):
         from scraper.parsers.hakuba_valley import parse_runs
         html = (FIXTURES / "hakuba_slopes.html").read_text(encoding="utf-8")  # saved 2026-11-27

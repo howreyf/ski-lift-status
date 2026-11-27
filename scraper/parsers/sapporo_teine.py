@@ -15,6 +15,32 @@ from scraper.common import NA, clean_hours, clean_text, lift, run, to_jst_iso, t
 ICON_TYPES = {"icon-gondola": "Gondola", "icon-lift1": "Single", "icon-lift2": "Pair",
               "icon-lift3": "Triple", "icon-lift4": "Quad", "icon-lift6": "Six"}
 
+# The status page has no difficulty, so it's taken from Teine's course guide (fixed per run).
+# Keys are the names as the status page writes them, lower case. "Super Expert" -> Expert.
+RUN_LEVELS = {
+    # Highland Zone
+    "city view cruise": "Intermediate",
+    "city view panorama": "Intermediate",
+    "women's giant slalom": "Advanced",
+    "kitakabe": "Expert",               # "KITAKABE" (North Face), Super Expert
+    "natural": "Beginner",
+    "men's and women's slalom": "Advanced",
+    "paradise": "Intermediate",
+    # Olympia Zone
+    "rainbow": "Beginner",
+    "sun shine": "Beginner",            # "SHIRAKABA" is the Sun
+    "sun trap": "Beginner",
+    "sun rise": "Intermediate",
+    "sun dance": "Beginner",
+    "ocean dive": "Advanced",           # "SEIKADAI" Ocean Dive
+    "ocean cruise": "Intermediate",
+    "ocean stream": "Intermediate",
+}
+
+
+def run_level(name: str) -> str | None:
+    return RUN_LEVELS.get(clean_text(name).lower().replace("’", "'"))
+
 
 def _items(container) -> list:
     return container.select("li.list-label__item") if container else []
@@ -42,7 +68,7 @@ def parse(html: str, options: dict) -> dict:
     for li in _items(course_tab):
         title, status = li.select_one(".list-label__title"), li.select_one(".list-label__status")
         if title:
-            runs.append(run(title.get_text(), status.get_text() if status else ""))
+            runs.append(run(title.get_text(), status.get_text() if status else "", level=run_level(title.get_text())))
 
     report = soup.select_one(".greport")
     data = {}
