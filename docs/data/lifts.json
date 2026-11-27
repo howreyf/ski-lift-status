@@ -1,6 +1,6 @@
 {
- "last_updated": "2026-11-27T12:24:43+09:00",
- "last_checked": "2026-11-27T12:24:43+09:00",
+ "last_updated": "2026-11-27T13:06:09+09:00",
+ "last_checked": "2026-11-27T13:06:09+09:00",
  "season_months": {
   "start": 11,
   "end": 4
@@ -98,8 +98,8 @@
      "runs_total": 22,
      "snow_depth_max_cm": 130,
      "snow_depth_max_date": "2026-11-27",
-     "temperature_min_c": 1.1,
-     "temperature_max_c": 1.1,
+     "temperature_min_c": 2.1,
+     "temperature_max_c": 2.1,
      "days_recorded": 1
     },
     "kiroro": {
