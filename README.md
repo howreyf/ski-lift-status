@@ -43,6 +43,11 @@ Plain HTML/CSS/JavaScript, no build step. Pages (the part after `#` in the addre
 | Historical | `#/history` | Search (season totals: lifts, runs by difficulty, mean base temperature and snow depth) and a directory |
 | A resort's history | `#/history/<id>/<unit>/<value>` | unit = `season` (2026-27), `month` (2026-12), `week` (the Sunday it starts) or `day`; period picker with search and ‹ › arrows; opening/closing day and first/last snow; lifts box that expands to the graph |
 
+| Compare | `#/compare` | Graph mode: up to 10 lines (a resort in a season each) on one graph, seasons lined up by date; choose the data point, "As a percentage", and whole season or a month range. Side-by-side mode: up to 5 resorts, each with its own season/month/week/day, sections open together |
+
+**Night skiing:** `night_skiing` in `resorts.yaml` (per season: dates, hours, lifts) shows a moon
+symbol beside the resort and its night lifts; hovering shows the dates.
+
 **Historical boxes** (season / month / week; each expands to a graph when clicked):
 
 | Box | Number | Graph | Go to day |

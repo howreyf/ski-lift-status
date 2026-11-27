@@ -909,14 +909,16 @@ async function renderResortPage(id, date) {
 function route(scrollTop = true) {
   const path = location.hash.replace(/^#\/?/, "");
   const [page, id, date, value] = path.split("/");
-  const tab = page === "resorts" || page === "resort" ? "resorts" : page === "history" ? "history" : "home";
+  const tab = page === "resorts" || page === "resort" ? "resorts" : page === "history" ? "history" : page === "compare" ? "compare" : "home";
   document.querySelectorAll(".tabs a").forEach(a => {
     if (a.dataset.tab === tab) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");
   });
   currentPage = null;
   if (page !== "history" && historyUI) { historyUI.graph?.destroy(); historyUI = null; }
+  if (page !== "compare" && compareGraph) { compareGraph.destroy(); compareGraph = null; }
   if (page === "history") id ? renderHistoryPage(decodeURIComponent(id), date, value) : renderHistoryDirectory();
+  else if (page === "compare") renderCompare();
   else if (page === "resort" && id) renderResortPage(decodeURIComponent(id), /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : null);
   else if (page === "resorts") renderDirectory();
   else renderHome();

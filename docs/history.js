@@ -774,12 +774,12 @@ function mountExpanded(id, recs, facts) {
   if (key === "lifts") {
     caption = `Lifts open each day, ${period}.`;
     graph = { points: ok.map(x => ({ date: x.date, value: x.r.lifts_open, total: x.r.lifts.length, lifts: x.r.lifts })),
-      yMax: ok.length ? ok[ok.length - 1].r.lifts.length : 0, yLabel: "Lifts open per day", details: liftsGraphDetails, onGoToDay: goToDay("lifts") };
+      yMax: ok.length ? ok[ok.length - 1].r.lifts.length : 0, yLabel: "Lifts open per day", integer: true, details: liftsGraphDetails, onGoToDay: goToDay("lifts") };
   } else if (key === "runs") {
     const withRuns = ok.filter(x => x.r.runs?.length);
     caption = `Runs open each day, ${period}.`;
     graph = { points: withRuns.map(x => ({ date: x.date, value: x.r.runs_open, runs: x.r.runs })),
-      yMax: withRuns.length ? withRuns[withRuns.length - 1].r.runs.length : 0, yLabel: "Runs open per day", details: runsGraphDetails, onGoToDay: goToDay("runs") };
+      yMax: withRuns.length ? withRuns[withRuns.length - 1].r.runs.length : 0, yLabel: "Runs open per day", integer: true, details: runsGraphDetails, onGoToDay: goToDay("runs") };
   } else if (key === "depth") {
     caption = `Snow depth each day, ${period}.`;
     graph = { points: ok.filter(x => x.r.snow_depth_cm != null).map(x => ({ date: x.date, value: x.r.snow_depth_cm })),
@@ -877,6 +877,10 @@ function factsHtml(f) {
 }
 
 async function renderHistoryPage(id, unit, value, carry = null) {
+  if (!carry && typeof pendingHistoryCarry !== "undefined" && pendingHistoryCarry) {
+    carry = pendingHistoryCarry; // e.g. "Go to day" from the Compare graph
+    pendingHistoryCarry = null;
+  }
   const info = state.index.resorts[id];
   if (!info) {
     view.innerHTML = `<p class="error">There's no resort called “${esc(id)}”.</p><p><a href="#/history">See all resorts</a></p>`;
