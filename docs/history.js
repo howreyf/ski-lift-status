@@ -17,7 +17,7 @@ const MONTH_NAMES = ["january", "february", "march", "april", "may", "june", "ju
   "september", "october", "november", "december"];
 const TYPE_ORDER = ["Ropeway", "Gondola", "Six", "Quad", "Triple", "Pair", "Single", "Magic carpet", "N/A"];
 
-let historyUI = null; // {id, unit, value, expanded, liftsView: "graph"|"day", day, graph}
+let historyUI = null; // {id, unit, value, expanded: box key | null, view: "graph"|"day", day, bucket, graph}
 
 // A click anywhere outside an open period picker closes it.
 document.addEventListener("click", () => {
@@ -359,7 +359,7 @@ async function seasonFacts(id, label) {
   };
 }
 
-// ------------------------------------------------------------------ lifts by type
+// ------------------------------------------------------------------ lifts by type, runs by difficulty
 
 function liftTypeCounts(lifts) {
   const counts = new Map();
@@ -387,11 +387,24 @@ function runGradeTotalsHtml(runs) {
     `<span class="grade grade-${c.grade.key}" title="${esc(c.grade.label)}: ${c.total} runs">${c.total}</span>`).join("")}</span>`;
 }
 
+/** Grade circles with a chosen count per difficulty (e.g. runs opened this month). */
+function gradeCirclesHtml(runs, countFn, titleWord) {
+  if (!runs?.length) return NA;
+  return `<span class="grades">${runsByGrade(runs).map(c => {
+    const n = countFn(c.grade);
+    return `<span class="grade grade-${c.grade.key}" title="${esc(c.grade.label)}: ${n} of ${c.total} runs ${titleWord}">${n}</span>`;
+  }).join("")}</span>`;
+}
+
+function gradeOf(level) {
+  return GRADES.find(g => g.levels.includes(level)) || GRADES[GRADES.length - 1];
+}
+
 // ------------------------------------------------------------------ Historical tab: directory and search
 
 /** Season averages for the search: last season if we have it, otherwise this season so far. */
 function lastSeasonSummary(id) {
-  const latest = availableSeasons().filter(l => !state.index.seasons[l].demo || IS_DEMO)[0];
+  const latest = availableSeasons()[0];
   if (!latest) return null;
   const prev = seasonLabel(seasonStartYear(latest) - 1);
   const p = state.index.seasons[prev]?.summary?.[id];
@@ -432,7 +445,7 @@ function renderHistoryDirectory() {
   setupSearch(view, HISTORY_SEARCH);
 }
 
-// ------------------------------------------------------------------ Historical resort page
+// ------------------------------------------------------------------ period statistics
 
 function savedHistoryView(id) {
   try { return JSON.parse(localStorage.getItem(`history:${id}`)); } catch { return null; }
@@ -441,11 +454,411 @@ function saveHistoryView(id, unit, value) {
   try { localStorage.setItem(`history:${id}`, JSON.stringify({ unit, value })); } catch { /* ignore */ }
 }
 
-function goHistory(id, unit, value) {
+/** Navigate to a period; `carry` keeps an open box / "go to day" view across the change. */
+function goHistory(id, unit, value, carry = null) {
   const hash = `#/history/${id}/${unit}/${value}`;
   if (location.hash !== hash) history.pushState(null, "", hash);
-  renderHistoryPage(id, unit, value);
+  renderHistoryPage(id, unit, value, carry);
 }
+
+function shortDay(iso) {
+  return new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-GB", { timeZone: "UTC", day: "numeric", month: "short" });
+}
+
+function isSnowDay(r) {
+  return (r.temps?.kind === "final" && r.temps.snow_hours > 0) || r.new_snow_cm > 0;
+}
+
+/** Season means leave out the first and last season month (November and May). */
+function meanRecords(recs, unit) {
+  if (unit !== "season") return recs;
+  const [startM, endM] = seasonMonthRange();
+  return recs.filter(x => {
+    const m = Number(x.date.slice(5, 7));
+    return m !== startM && m !== endM;
+  });
+}
+function meanMonthsLabel() {
+  const [startM, endM] = seasonMonthRange();
+  const name = m => MONTH_NAMES[(m + 11) % 12].slice(0, 3).replace(/^./, c => c.toUpperCase());
+  return `${name(startM + 1)}–${name(endM - 1)}`;
+}
+
+function mean(nums) {
+  return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null;
+}
+
+/** Where a resort's new snow amounts come from: its own reports if it publishes them. */
+function snowSource(recs) {
+  return recs.some(x => x.r.ok && x.r.new_snow_cm != null) ? "resort" : "model";
+}
+function snowAmount(r, source) {
+  if (source === "resort") return r.ok ? r.new_snow_cm ?? null : null;
+  return r.temps?.kind === "final" ? r.temps.snowfall_cm ?? null : null;
+}
+
+/** Status of a lift or run over a period: "28 Nov – present", "Opened on 5 Dec", ... */
+function periodStatus(days, unit) {
+  const open = days.filter(d => d.open);
+  if (!days.length) return { cls: "unknown", text: NA };
+  if (!open.length) return { cls: "closed", text: unit === "season" ? "Closed all season" : "Closed" };
+  const firstRec = days[0].date, lastRec = days[days.length - 1].date;
+  const first = open[0].date, last = open[open.length - 1].date;
+  const present = last === lastRec && lastRec === state.latestDate;
+  const end = present ? "present" : shortDay(last);
+  if (unit === "season") return { cls: present ? "open" : "partial", text: `${shortDay(first)} – ${end}` };
+  // open at the start and the end of the period (gaps in between ignored) = open the whole period
+  if (first === firstRec && last === lastRec) return { cls: "open", text: present ? "Open (so far)" : "Open" };
+  if (first > firstRec && last === lastRec) return { cls: "partial", text: `Opened on ${shortDay(first)}${present ? " – present" : ""}` };
+  if (first === firstRec && last < lastRec) return { cls: "partial", text: `Open until ${shortDay(last)}` };
+  return { cls: "partial", text: `Open ${shortDay(first)} – ${end}` };
+}
+
+/** Each lift or run over the period: latest details + the day-by-day open flag. */
+function itemsOverPeriod(recs, field, isOpen) {
+  const ok = recs.filter(x => x.r.ok && x.r[field]?.length);
+  const latest = new Map();
+  const days = new Map();
+  for (const x of ok) {
+    for (const item of x.r[field]) {
+      latest.set(item.name, item);
+      if (!days.has(item.name)) days.set(item.name, []);
+      days.get(item.name).push({ date: x.date, open: isOpen(item) });
+    }
+  }
+  return [...latest.values()].map(item => ({ item, days: days.get(item.name) }));
+}
+
+// ------------------------------------------------------------------ boxes for a season / month / week
+
+function unitWord(unit) {
+  return UNIT_LABEL[unit].toLowerCase();
+}
+
+/** A box that expands to a graph when clicked. */
+function expandableBox(key, label, inner, fill, extraClass, ui) {
+  return box(key, label, `${inner}<div class="box-note box-more">${ui.unit === "day" ? "Show the day ›" : "Show graph ›"}</div>`, fill,
+    `${extraClass} box-clickable`).replace(`data-box="${key}"`, `data-box="${key}" role="button" tabindex="0" aria-expanded="false"`);
+}
+
+function expandedBox(key, label, headHtml) {
+  return `
+    <div class="box box-expanded" data-box="${key}">
+      <div class="box-body">
+        <div class="expanded-head">
+          <div><div class="box-label">${label}</div>${headHtml}</div>
+          <button type="button" class="link-button" data-collapse aria-label="Close">Close ✕</button>
+        </div>
+        <div class="expanded-content"></div>
+      </div>
+    </div>`;
+}
+
+function periodBoxes(id, recs, ui) {
+  const ok = recs.filter(x => x.r.ok);
+  const latest = ok[ok.length - 1]?.r;
+  const word = unitWord(ui.unit);
+  const out = [];
+
+  // lifts
+  if (!latest) out.push(box("lifts", "Lifts open", `<div class="box-value">${NA}</div><div class="box-note">No data in this period</div>`));
+  else {
+    const total = latest.lifts.length;
+    const opened = new Set(ok.flatMap(x => x.r.lifts.filter(l => l.status === "open").map(l => l.name)));
+    const peak = ok.reduce((a, b) => (b.r.lifts_open > a.r.lifts_open ? b : a));
+    out.push(ui.expanded === "lifts"
+      ? expandedBox("lifts", "Lifts", `<div class="box-value">Total lifts: ${total}</div>
+          <div class="box-note">${liftTypeTotalsHtml(latest.lifts)} · ${opened.size} opened at least once this ${word}</div>`)
+      : expandableBox("lifts", "Lifts open", `<div class="box-value">${opened.size} <small>/ ${total}</small></div>
+          <div class="box-note">opened at least once this ${word} · peak ${peak.r.lifts_open} on ${esc(shortDay(peak.date))}</div>`,
+        pct(opened.size, total), "fill-green", ui));
+  }
+
+  // runs
+  const withRuns = ok.filter(x => x.r.runs?.length);
+  if (!withRuns.length) out.push(box("runs", "Runs open", `<div class="box-value">${NA}</div><div class="box-note">Not published by the resort</div>`));
+  else {
+    const runs = withRuns[withRuns.length - 1].r.runs;
+    const openedNames = new Set(withRuns.flatMap(x => x.r.runs.filter(r => r.status === "open" || r.status === "partial").map(r => r.name)));
+    const openedByGrade = g => runs.filter(r => gradeOf(r.level) === g && openedNames.has(r.name)).length;
+    out.push(ui.expanded === "runs"
+      ? expandedBox("runs", "Runs", `<div class="box-value">Total runs: ${runs.length}</div>
+          <div class="box-note">${runGradeTotalsHtml(runs)} · ${openedNames.size} opened at least once this ${word}</div>`)
+      : expandableBox("runs", "Runs open", `<div class="box-value">${openedNames.size} <small>/ ${runs.length}</small></div>
+          <div class="box-grades">${gradeCirclesHtml(runs, openedByGrade, `opened this ${word}`)}</div>
+          <div class="box-note">opened at least once this ${word}</div>`,
+        pct(openedNames.size, runs.length), "fill-green", ui));
+  }
+
+  // snow depth
+  const depthRecs = meanRecords(ok, ui.unit).filter(x => x.r.snow_depth_cm != null);
+  const depthMean = mean(depthRecs.map(x => x.r.snow_depth_cm));
+  const depthAll = ok.filter(x => x.r.snow_depth_cm != null);
+  const depthNote = ui.unit === "season" ? `mean, ${meanMonthsLabel()}` : `mean this ${word}`;
+  out.push(!depthAll.length ? box("depth", "Snow depth", `<div class="box-value">${NA}</div><div class="box-note">Not published by the resort</div>`)
+    : ui.expanded === "depth"
+      ? expandedBox("depth", "Snow depth", `<div class="box-value">${depthMean != null ? `${Math.round(depthMean)} cm` : NA}</div><div class="box-note">${depthNote}</div>`)
+      : expandableBox("depth", "Snow depth", `<div class="box-value">${depthMean != null ? `${Math.round(depthMean)} <small>cm</small>` : NA}</div>
+          <div class="box-note">${depthNote} · max ${Math.max(...depthAll.map(x => x.r.snow_depth_cm))} cm</div>`, null, "", ui));
+
+  // new snow: days it snowed
+  const snowDays = ok.filter(x => isSnowDay(x.r)).map(x => x.date);
+  const [pStart, pEnd] = periodRange(ui.unit, ui.value);
+  let denom, denomText;
+  if (ui.unit === "season") {
+    denom = snowDays.length ? dayNumber(snowDays[snowDays.length - 1]) - dayNumber(snowDays[0]) + 1 : 0;
+    denomText = "days from first to last snow";
+  } else {
+    const until = todayIso() < pEnd ? todayIso() : pEnd;
+    denom = Math.max(0, dayNumber(until) - dayNumber(pStart) + 1);
+    denomText = until < pEnd ? `days of this ${word} so far` : `days this ${word}`;
+  }
+  const snowInner = `<div class="box-value">${snowDays.length} <small>/ ${denom} days</small></div>
+    <div class="box-note">snowed on ${denom ? Math.round((snowDays.length / denom) * 100) : 0}% of ${denomText}</div>`;
+  out.push(ui.expanded === "snow"
+    ? expandedBox("snow", "New snow", snowInner)
+    : expandableBox("snow", "New snow", snowInner, null, "", ui));
+
+  // temperatures
+  for (const level of ["base", "summit"]) {
+    const info = state.index.resorts[id];
+    const elevation = info.elevation_m?.[level];
+    const title = `${level === "summit" ? "Summit" : "Base"} at ${elevation ? `${Number(elevation).toLocaleString("en-GB")} m` : NA}`;
+    const finals = meanRecords(recs, ui.unit).filter(x => x.r.temps?.kind === "final" && x.r.temps[level]?.mean_c != null);
+    const m = mean(finals.map(x => x.r.temps[level].mean_c));
+    const note = `mean of daily means${ui.unit === "season" ? `, ${meanMonthsLabel()}` : ` this ${word}`}`;
+    const inner = `<div class="box-value">${m != null ? `${deg(m)} <small>°C</small>` : NA}</div>
+      <div class="box-note">${m != null ? note : "no finished days yet"}</div>`;
+    out.push(ui.expanded === level ? expandedBox(level, title, inner) : expandableBox(level, title, inner, null, "", ui));
+  }
+  return out.join("");
+}
+
+/** Day view: the usual boxes; lifts and runs open their "go to day" view when clicked. */
+function dayBoxes(id, r, date, ui) {
+  if (ui.expanded === "lifts" && r?.ok) {
+    return expandedBox("lifts", "Lifts", `<div class="box-value">${r.lifts_open} <small>/ ${r.lifts.length} open</small></div>
+      <div class="box-note">${liftTypeTotalsHtml(r.lifts, true)}</div>`)
+      + runsBox(id, r) + snowDepthBox(id, r, date, false) + newSnowBox(id, r, date, false)
+      + tempBox(id, "base", r, date, false) + tempBox(id, "summit", r, date, false);
+  }
+  if (ui.expanded === "runs" && r?.ok && r.runs?.length) {
+    return liftsBox(id, r) + expandedBox("runs", "Runs", `<div class="box-value">${r.runs_open} <small>/ ${r.runs.length} open</small></div>
+      <div class="box-note">${runGradeTotalsHtml(r.runs)}</div>`)
+      + snowDepthBox(id, r, date, false) + newSnowBox(id, r, date, false)
+      + tempBox(id, "base", r, date, false) + tempBox(id, "summit", r, date, false);
+  }
+  const clickable = (html, key) => html.replace(`data-box="${key}"`, `data-box="${key}" role="button" tabindex="0" aria-expanded="false"`)
+    .replace(`class="box `, `class="box box-clickable `);
+  let liftsHtml = liftsBox(id, r), runsHtml = runsBox(id, r);
+  if (r?.ok) liftsHtml = clickable(liftsHtml, "lifts");
+  if (r?.ok && r.runs?.length) runsHtml = clickable(runsHtml, "runs");
+  return liftsHtml + runsHtml + snowDepthBox(id, r, date, false) + newSnowBox(id, r, date, false)
+    + tempBox(id, "base", r, date, false) + tempBox(id, "summit", r, date, false);
+}
+
+// ------------------------------------------------------------------ expanded box contents (graphs and "go to day")
+
+function liftsGraphDetails(p) {
+  return `<div class="tip-value"><strong>${p.value}</strong> lift${p.value === 1 ? "" : "s"} open <span class="muted">of ${p.total}</span></div>
+    <div class="tip-date">${esc(formatDay(p.date))}</div>
+    <div class="tip-types">${liftTypeCounts(p.lifts).map(c => `
+      <div class="tip-type">${c.type === "N/A" ? `<span class="type-na">?</span>` : typeIcon(c.type, true)}
+        <span>${esc(TYPE_LABEL[c.type] || "Type not published")}</span><strong>${c.open}</strong><span class="muted">/ ${c.total}</span></div>`).join("")}</div>`;
+}
+
+function runsGraphDetails(p) {
+  return `<div class="tip-value"><strong>${p.value}</strong> run${p.value === 1 ? "" : "s"} open <span class="muted">of ${p.runs.length}</span></div>
+    <div class="tip-date">${esc(formatDay(p.date))}</div>
+    <div class="tip-types">${runsByGrade(p.runs).map(c => `
+      <div class="tip-type"><span class="grade grade-${c.grade.key} grade-dot"></span>
+        <span>${esc(c.grade.label)}</span><strong>${c.open}</strong><span class="muted">/ ${c.total}</span></div>`).join("")}</div>`;
+}
+
+/** Group daily snow amounts into bars of a day, a week (Sun–Sat) or a month. */
+function snowBars(recs, source, bucket, start, end) {
+  const groups = new Map();
+  for (const x of recs) {
+    const amount = snowAmount(x.r, source);
+    if (amount == null) continue;
+    const key = bucket === "day" ? x.date : bucket === "week" ? sundayOf(x.date) : x.date.slice(0, 7);
+    const g = groups.get(key) || { value: 0, days: 0, snowDays: 0 };
+    g.value += amount;
+    g.days += 1;
+    if (isSnowDay(x.r)) g.snowDays += 1;
+    groups.set(key, g);
+  }
+  return [...groups].map(([key, g]) => {
+    let s = key, e = key;
+    if (bucket === "week") e = addDaysIso(key, 6);
+    if (bucket === "month") { s = `${key}-01`; e = monthEnd(key); }
+    if (s < start) s = start;
+    if (e > end) e = end;
+    return { date: s, end: e, value: Math.round(g.value * 10) / 10, days: g.days, snowDays: g.snowDays, bucket };
+  });
+}
+
+function snowBarDetails(p) {
+  const label = p.bucket === "day" ? formatDay(p.date)
+    : p.bucket === "week" ? `${shortDay(p.date)} – ${formatDay(p.end)}`
+    : periodLabel("month", p.date.slice(0, 7));
+  return `<div class="tip-value"><strong>${p.value}</strong> cm new snow</div>
+    <div class="tip-date">${esc(label)}</div>
+    ${p.bucket !== "day" ? `<div class="muted">snowed on ${p.snowDays} of ${p.days} recorded day${p.days === 1 ? "" : "s"}</div>` : ""}`;
+}
+
+const SNOW_BUCKETS = { season: ["day", "week", "month"], month: ["day", "week"], week: ["day"] };
+const DEFAULT_BUCKET = { season: "week", month: "week", week: "day" };
+
+/** "Go to day" for lifts or runs, with ‹ date › that moves the page's period when needed. */
+async function mountDayView(id, key, host, ui, opts) {
+  const date = ui.day;
+  const r = await recordFor(id, date);
+  const [sStart, sEnd] = periodRange("season", seasonOf(date));
+  const table = !r ? `<p class="muted">No record for this day.</p>`
+    : !r.ok ? `<p class="muted">Couldn't read the resort's page this day.</p>`
+    : key === "lifts" ? liftsTable(r.lifts, true) : runsTable(r.runs || [], true);
+  host.innerHTML = `
+    <div class="dayview-head">
+      <div class="dayview-nav">
+        <button type="button" class="pk-arrow" data-day="-1" aria-label="Previous day"${date <= sStart ? " disabled" : ""}>‹</button>
+        <strong>${esc(formatDay(date))}</strong>
+        <button type="button" class="pk-arrow" data-day="1" aria-label="Next day"${date >= sEnd ? " disabled" : ""}>›</button>
+      </div>
+      ${opts.returnToGraph ? `<button type="button" class="button button-secondary" data-return>Return to graph</button>` : ""}
+    </div>
+    ${table}`;
+  host.querySelectorAll("[data-day]").forEach(b => b.addEventListener("click", () => {
+    const next = addDaysIso(ui.day, Number(b.dataset.day));
+    if (next < sStart || next > sEnd) return; // capped at the season
+    const [pStart, pEnd] = periodRange(ui.unit, ui.value);
+    if (next < pStart || next > pEnd) {
+      // crossed into another month / week / day: move the page's period selector too
+      goHistory(id, ui.unit, unitContaining(ui.unit, next), { expanded: key, view: "day", day: next });
+    } else {
+      ui.day = next;
+      mountDayView(id, key, host, ui, opts);
+    }
+  }));
+  host.querySelector("[data-return]")?.addEventListener("click", () => {
+    ui.view = "graph";
+    mountExpanded(id, opts.recs, opts.facts);
+  });
+}
+
+function mountExpanded(id, recs, facts) {
+  const ui = historyUI;
+  const key = ui?.expanded;
+  const host = key && view.querySelector(`[data-box="${key}"] .expanded-content`);
+  if (!host) return;
+  ui.graph?.destroy();
+  ui.graph = null;
+
+  if (ui.unit === "day") return mountDayView(id, key, host, ui, { returnToGraph: false });
+  if ((key === "lifts" || key === "runs") && ui.view === "day") {
+    return mountDayView(id, key, host, ui, { returnToGraph: true, recs, facts });
+  }
+
+  const [start, end] = periodRange(ui.unit, ui.value);
+  const ok = recs.filter(x => x.r.ok);
+  const markers = [];
+  if (facts?.open) markers.push({ date: facts.open, label: "Opening day" });
+  if (facts?.close) markers.push({ date: facts.close, label: "Closing day" });
+  const period = esc(periodLabel(ui.unit, ui.value));
+  const goToDay = k => date => { ui.view = "day"; ui.day = date; ui.expanded = k; mountExpanded(id, recs, facts); };
+  let caption, graph, below = "";
+
+  if (key === "lifts") {
+    caption = `Lifts open each day, ${period}.`;
+    graph = { points: ok.map(x => ({ date: x.date, value: x.r.lifts_open, total: x.r.lifts.length, lifts: x.r.lifts })),
+      yMax: ok.length ? ok[ok.length - 1].r.lifts.length : 0, yLabel: "Lifts open per day", details: liftsGraphDetails, onGoToDay: goToDay("lifts") };
+  } else if (key === "runs") {
+    const withRuns = ok.filter(x => x.r.runs?.length);
+    caption = `Runs open each day, ${period}.`;
+    graph = { points: withRuns.map(x => ({ date: x.date, value: x.r.runs_open, runs: x.r.runs })),
+      yMax: withRuns.length ? withRuns[withRuns.length - 1].r.runs.length : 0, yLabel: "Runs open per day", details: runsGraphDetails, onGoToDay: goToDay("runs") };
+  } else if (key === "depth") {
+    caption = `Snow depth each day, ${period}.`;
+    graph = { points: ok.filter(x => x.r.snow_depth_cm != null).map(x => ({ date: x.date, value: x.r.snow_depth_cm })),
+      yLabel: "Snow depth per day, cm",
+      details: p => `<div class="tip-value"><strong>${p.value}</strong> cm</div><div class="tip-date">${esc(formatDay(p.date))}</div>` };
+  } else if (key === "snow") {
+    const source = snowSource(recs);
+    const buckets = SNOW_BUCKETS[ui.unit];
+    const bucket = buckets.includes(ui.bucket?.[ui.unit]) ? ui.bucket[ui.unit] : DEFAULT_BUCKET[ui.unit];
+    const word = { day: "day", week: "week", month: "month" }[bucket];
+    caption = `New snow per ${word}, ${period} (${source === "resort" ? "as reported by the resort" : "weather-model snowfall at the summit"}).`;
+    graph = { kind: "bars", points: snowBars(recs, source, bucket, start, end), yLabel: `New snow per ${word}, cm`, details: snowBarDetails };
+    if (buckets.length > 1) {
+      below = `<div class="bucket-toggle" role="radiogroup" aria-label="One bar per">
+        <span class="muted small">One bar per</span>
+        ${buckets.map(b => `<button type="button" role="radio" aria-checked="${b === bucket}" class="seg-btn${b === bucket ? " is-active" : ""}" data-bucket="${b}">${b[0].toUpperCase() + b.slice(1)}</button>`).join("")}
+      </div>`;
+    }
+  } else {
+    const level = key;
+    const finals = recs.filter(x => x.r.temps?.kind === "final" && x.r.temps[level]?.mean_c != null);
+    caption = `Mean ${level} temperature each day, ${period}.`;
+    graph = { points: finals.map(x => ({ date: x.date, value: x.r.temps[level].mean_c, t: x.r.temps[level] })),
+      yLabel: `Mean ${level} temperature per day, °C`,
+      details: p => `<div class="tip-value"><strong>${deg(p.value)}</strong> °C mean</div><div class="tip-date">${esc(formatDay(p.date))}</div>
+        <div class="muted">min ${deg(p.t.min_c)} · max ${deg(p.t.max_c)} °C</div>` };
+  }
+
+  host.innerHTML = `<p class="muted small graph-caption">${caption} Hover or click the graph for details.</p><div class="graph-host"></div>${below}`;
+  ui.graph = createGraph(host.querySelector(".graph-host"), { start, end, markers, ...graph });
+  host.querySelectorAll("[data-bucket]").forEach(b => b.addEventListener("click", () => {
+    ui.bucket = { ...(ui.bucket || {}), [ui.unit]: b.dataset.bucket };
+    mountExpanded(id, recs, facts);
+  }));
+}
+
+// ------------------------------------------------------------------ lists below the boxes
+
+function periodListsHtml(recs, unit) {
+  const ok = recs.filter(x => x.r.ok);
+  if (!ok.length) return "";
+  const word = unitWord(unit);
+  const lifts = itemsOverPeriod(ok, "lifts", l => l.status === "open");
+  const runs = itemsOverPeriod(ok, "runs", r => r.status === "open" || r.status === "partial");
+  const liftsOpened = lifts.filter(x => x.days.some(d => d.open)).length;
+  const runsOpened = runs.filter(x => x.days.some(d => d.open)).length;
+  const badge = s => `<span class="badge s-${s.cls === "partial" ? "partial" : s.cls}">${esc(s.text)}</span>`;
+
+  let html = `
+    <details class="detail-table">
+      <summary><span class="summary-title">Lifts <span class="muted">· ${liftsOpened} of ${lifts.length} opened this ${word}</span></span>
+        ${liftTypeTotalsHtml(lifts.map(x => x.item))}</summary>
+      <table>
+        <thead><tr><th>Lift</th><th>Status this ${word}</th><th>Operating hours</th><th>Type</th></tr></thead>
+        <tbody>${lifts.map(({ item: l, days }) => `
+          <tr>
+            <td>${esc(l.name_en)}${l.name !== l.name_en ? `<span class="cell-note" lang="ja">${esc(l.name)}</span>` : ""}</td>
+            <td>${badge(periodStatus(days, unit))}</td>
+            <td class="num">${esc(l.hours)}</td>
+            <td>${typeIcon(l.lift_type)}</td>
+          </tr>`).join("")}</tbody>
+      </table>
+    </details>`;
+  if (!runs.length) return html + `<p class="muted small">Runs: ${NA} (the resort doesn't publish run status).</p>`;
+  html += `
+    <details class="detail-table">
+      <summary><span class="summary-title">Runs <span class="muted">· ${runsOpened} of ${runs.length} opened this ${word}</span></span>
+        ${runGradeTotalsHtml(runs.map(x => x.item))}</summary>
+      <table>
+        <thead><tr><th>Run</th><th>Status this ${word}</th><th>Difficulty</th></tr></thead>
+        <tbody>${runs.map(({ item: x, days }) => `
+          <tr>
+            <td>${esc(x.name_en)}${x.name !== x.name_en ? `<span class="cell-note" lang="ja">${esc(x.name)}</span>` : ""}</td>
+            <td>${badge(periodStatus(days, unit))}</td>
+            <td>${difficultyHtml(x.level)}</td>
+          </tr>`).join("")}</tbody>
+      </table>
+    </details>`;
+  return html;
+}
+
+// ------------------------------------------------------------------ Historical resort page
 
 function factsHtml(f) {
   if (!f) return "";
@@ -460,101 +873,7 @@ function factsHtml(f) {
   </div>`;
 }
 
-/** Lifts box for a season / month / week: lifts that opened at least once, expandable to the graph. */
-function periodLiftsBox(recs, ui) {
-  const ok = recs.filter(x => x.r.ok);
-  if (!ok.length) return box("lifts", "Lifts open", `<div class="box-value">${NA}</div><div class="box-note">No data in this period</div>`);
-  const latest = ok[ok.length - 1].r;
-  const total = latest.lifts.length;
-  const opened = new Set(ok.flatMap(x => x.r.lifts.filter(l => l.status === "open").map(l => l.name)));
-  const peak = ok.reduce((a, b) => (b.r.lifts_open > a.r.lifts_open ? b : a));
-  const unitWord = UNIT_LABEL[ui.unit].toLowerCase();
-  if (!ui.expanded) {
-    return box("lifts", "Lifts open",
-      `<div class="box-value">${opened.size} <small>/ ${total}</small></div>
-       <div class="box-note">opened at least once this ${unitWord} · peak ${peak.r.lifts_open} on ${esc(formatDay(peak.date).slice(0, -5))}</div>
-       <div class="box-note box-more">Show graph ›</div>`,
-      pct(opened.size, total), "fill-green box-clickable").replace(`data-box="lifts"`, `data-box="lifts" role="button" tabindex="0" aria-expanded="false"`);
-  }
-  return `
-    <div class="box box-expanded" data-box="lifts">
-      <div class="box-body">
-        <div class="expanded-head">
-          <div>
-            <div class="box-label">Lifts</div>
-            <div class="box-value">Total lifts: ${total}</div>
-            <div class="box-note">${liftTypeTotalsHtml(latest.lifts)} · ${opened.size} opened at least once this ${unitWord}</div>
-          </div>
-          <button type="button" class="link-button" data-collapse aria-label="Close the graph">Close ✕</button>
-        </div>
-        <div class="expanded-content"></div>
-      </div>
-    </div>`;
-}
-
-function liftsGraphDetails(p) {
-  return `<div class="tip-value"><strong>${p.value}</strong> lift${p.value === 1 ? "" : "s"} open <span class="muted">of ${p.total}</span></div>
-    <div class="tip-date">${esc(formatDay(p.date))}</div>
-    <div class="tip-types">${liftTypeCounts(p.lifts).map(c => `
-      <div class="tip-type">${c.type === "N/A" ? `<span class="type-na">?</span>` : typeIcon(c.type, true)}
-        <span>${esc(TYPE_LABEL[c.type] || "Type not published")}</span><strong>${c.open}</strong><span class="muted">/ ${c.total}</span></div>`).join("")}</div>`;
-}
-
-async function mountLiftsExpanded(id, recs, facts) {
-  const host = view.querySelector('[data-box="lifts"] .expanded-content');
-  if (!host || !historyUI) return;
-  historyUI.graph?.destroy();
-  historyUI.graph = null;
-  const [start, end] = periodRange(historyUI.unit, historyUI.value);
-
-  if (historyUI.liftsView === "day") {
-    const date = historyUI.day;
-    const r = await recordFor(id, date);
-    host.innerHTML = `
-      <div class="dayview-head">
-        <div class="dayview-nav">
-          <button type="button" class="pk-arrow" data-day="-1" aria-label="Previous day">‹</button>
-          <strong>${esc(formatDay(date))}</strong>
-          <button type="button" class="pk-arrow" data-day="1" aria-label="Next day">›</button>
-        </div>
-        <button type="button" class="button button-secondary" data-return>Return to graph</button>
-      </div>
-      ${r?.ok ? liftsTable(r.lifts, true)
-        : `<p class="muted">${r ? "Couldn't read the resort's page this day." : "No record for this day."}</p>`}`;
-    host.querySelectorAll("[data-day]").forEach(b => b.addEventListener("click", () => {
-      historyUI.day = addDaysIso(historyUI.day, Number(b.dataset.day));
-      mountLiftsExpanded(id, recs, facts);
-    }));
-    host.querySelector("[data-return]").addEventListener("click", () => {
-      historyUI.liftsView = "graph";
-      mountLiftsExpanded(id, recs, facts);
-    });
-    return;
-  }
-
-  const ok = recs.filter(x => x.r.ok);
-  const total = ok.length ? ok[ok.length - 1].r.lifts.length : 0;
-  const markers = [];
-  if (facts?.open) markers.push({ date: facts.open, label: "Opening day" });
-  if (facts?.close) markers.push({ date: facts.close, label: "Closing day" });
-  host.innerHTML = `<p class="muted small graph-caption">Lifts open each day, ${esc(periodLabel(historyUI.unit, historyUI.value))}.
-    Hover or click the graph for a day's details.</p><div class="graph-host"></div>`;
-  historyUI.graph = createGraph(host.querySelector(".graph-host"), {
-    start, end,
-    points: ok.map(x => ({ date: x.date, value: x.r.lifts_open, total: x.r.lifts.length, lifts: x.r.lifts })),
-    yMax: total,
-    yLabel: "Lifts open",
-    markers,
-    details: liftsGraphDetails,
-    onGoToDay: date => {
-      historyUI.liftsView = "day";
-      historyUI.day = date;
-      mountLiftsExpanded(id, recs, facts);
-    },
-  });
-}
-
-async function renderHistoryPage(id, unit, value) {
+async function renderHistoryPage(id, unit, value, carry = null) {
   const info = state.index.resorts[id];
   if (!info) {
     view.innerHTML = `<p class="error">There's no resort called “${esc(id)}”.</p><p><a href="#/history">See all resorts</a></p>`;
@@ -568,40 +887,36 @@ async function renderHistoryPage(id, unit, value) {
   }
   recent.add(id);
   saveHistoryView(id, unit, value);
-  const samePeriod = historyUI?.id === id && historyUI.unit === unit && historyUI.value === value;
+  const prev = historyUI?.id === id ? historyUI : null;
   historyUI?.graph?.destroy();
+  let expanded = carry?.expanded ?? prev?.expanded ?? null;
+  if (unit === "day" && !["lifts", "runs"].includes(expanded)) expanded = null;
   historyUI = {
-    id, unit, value,
-    expanded: historyUI?.id === id ? historyUI.expanded : false,
-    liftsView: samePeriod ? historyUI.liftsView : "graph",
-    day: samePeriod ? historyUI.day : null,
+    id, unit, value, expanded,
+    view: carry?.view ?? (unit === "day" ? "day" : "graph"),
+    day: carry?.day ?? (unit === "day" ? value : null),
+    bucket: prev?.bucket || {},
     graph: null,
   };
+  if (unit === "day") historyUI.day = value;
   currentPage = null;
 
   const [start, end] = periodRange(unit, value);
   const label = unit === "season" ? value : seasonOf(start);
   const [recs, facts] = await Promise.all([recordsInRange(id, start, end), seasonFacts(id, label)]);
-  if (historyUI.id !== id || historyUI.value !== value) return; // navigated away while loading
+  if (historyUI.id !== id || historyUI.value !== value || historyUI.unit !== unit) return; // navigated away
 
-  const last = recs[recs.length - 1];
   let content;
   if (unit === "day") {
-    const r = last?.r;
+    const r = recs[0]?.r;
     content = `
       ${!r ? `<p class="warn">No record for this day.</p>` : !r.ok ? `<p class="warn">Couldn't read the resort's page this day.</p>` : ""}
-      <div class="boxes">${boxesHtml(id, r, value, false)}</div>
+      <div class="boxes">${dayBoxes(id, r, value, historyUI)}</div>
       ${r?.ok ? liftsTable(r.lifts) + runsTable(r.runs || []) : ""}`;
   } else {
-    const rep = last?.r;
     content = `
-      <div class="boxes">
-        ${periodLiftsBox(recs, historyUI)}
-        ${rep ? runsBox(id, rep) + snowDepthBox(id, rep, last.date, false) + newSnowBox(id, rep, last.date, false)
-          + tempBox(id, "base", rep, last.date, false) + tempBox(id, "summit", rep, last.date, false) : ""}
-      </div>
-      ${rep ? `<p class="muted small">Boxes other than lifts show ${esc(formatDay(last.date))}, the last recorded day of this period. (Period views for them are coming.)</p>`
-        : `<p class="muted">No data recorded in this period.</p>`}`;
+      <div class="boxes">${periodBoxes(id, recs, historyUI)}</div>
+      ${recs.length ? periodListsHtml(recs, unit) : `<p class="muted">No data recorded in this period.</p>`}`;
   }
 
   view.innerHTML = `
@@ -641,27 +956,30 @@ async function renderHistoryPage(id, unit, value) {
     ${content}`;
 
   // period controls
-  view.querySelectorAll(".seg-btn").forEach(b => b.addEventListener("click", () => {
-    const anchor = (last?.date && last.date >= start && last.date <= end) ? last.date : (todayIso() >= start && todayIso() <= end ? todayIso() : start);
+  const last = recs[recs.length - 1];
+  view.querySelectorAll(".seg-btn[data-unit]").forEach(b => b.addEventListener("click", () => {
+    const anchor = last?.date || (todayIso() >= start && todayIso() <= end ? todayIso() : start);
     goHistory(id, b.dataset.unit, unitContaining(b.dataset.unit, anchor));
   }));
   setupPicker(view.querySelector(".picker"), unit, value, v => goHistory(id, unit, v));
 
-  // expandable lifts box
-  const liftsBox = view.querySelector('[data-box="lifts"]');
-  if (unit !== "day" && liftsBox) {
-    if (historyUI.expanded) {
-      liftsBox.querySelector("[data-collapse]")?.addEventListener("click", () => {
-        historyUI.expanded = false;
-        renderHistoryPage(id, unit, value);
-      });
-      mountLiftsExpanded(id, recs, facts);
-    } else if (liftsBox.classList.contains("box-clickable")) {
-      const expand = () => { historyUI.expanded = true; historyUI.liftsView = "graph"; renderHistoryPage(id, unit, value); };
-      liftsBox.addEventListener("click", expand);
-      liftsBox.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); expand(); } });
-    }
-  }
+  // boxes: expand / collapse
+  view.querySelectorAll(".box-clickable[data-box]").forEach(el => {
+    const key = el.dataset.box;
+    const expand = () => {
+      historyUI.expanded = key;
+      historyUI.view = unit === "day" ? "day" : "graph";
+      historyUI.day = unit === "day" ? value : historyUI.day;
+      renderHistoryPage(id, unit, value, { expanded: key, view: historyUI.view, day: historyUI.day });
+    };
+    el.addEventListener("click", expand);
+    el.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); expand(); } });
+  });
+  view.querySelector("[data-collapse]")?.addEventListener("click", () => {
+    historyUI.expanded = null;
+    renderHistoryPage(id, unit, value, { expanded: null });
+  });
+  if (historyUI.expanded) mountExpanded(id, recs, facts);
 }
 
 // ------------------------------------------------------------------ demo season (only with ?demo)
@@ -717,7 +1035,7 @@ function injectDemoSeason() {
         snow_depth_cm: Math.round(depth), new_snow_cm: newSnow,
         lifts, runs,
         temps: {
-          kind: "final", snow_hours: snowHours, snowed: snowHours >= 3,
+          kind: "final", snow_hours: snowHours, snowed: snowHours >= 3, snowfall_cm: newSnow,
           summit: { elevation_m: state.index.resorts[id].elevation_m?.summit, min_c: +(mean - 9).toFixed(1), max_c: +(mean - 1).toFixed(1), mean_c: +(mean - 5).toFixed(1) },
           base: { elevation_m: state.index.resorts[id].elevation_m?.base, min_c: +(mean - 3).toFixed(1), max_c: +(mean + 5).toFixed(1), mean_c: +mean.toFixed(1) },
         },

@@ -403,6 +403,7 @@ class TestTemperatures(unittest.TestCase):
         apply_temps(season, self.RESORT, out, today="2026-11-27")
         past, today = (season["days"][i]["results"]["a"] for i in (0, 1))
         self.assertEqual((past["temps"]["kind"], past["temps"]["snow_hours"], past["temps"]["snowed"]), ("final", 4, True))
+        self.assertEqual(past["temps"]["snowfall_cm"], 2.0)  # the day's model snowfall at the summit
         self.assertNotIn("snow_outlook", past)  # deleted once the day is over
         self.assertEqual(today["temps"]["kind"], "forecast")
         self.assertNotIn("snow_hours", today["temps"])

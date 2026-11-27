@@ -43,7 +43,23 @@ Plain HTML/CSS/JavaScript, no build step. Pages (the part after `#` in the addre
 | Historical | `#/history` | Search (season totals: lifts, runs by difficulty, mean base temperature and snow depth) and a directory |
 | A resort's history | `#/history/<id>/<unit>/<value>` | unit = `season` (2026-27), `month` (2026-12), `week` (the Sunday it starts) or `day`; period picker with search and ‹ › arrows; opening/closing day and first/last snow; lifts box that expands to the graph |
 
-**The graph** (`docs/graph.js`) shows one value per day: hover for a small box with that day's
+**Historical boxes** (season / month / week; each expands to a graph when clicked):
+
+| Box | Number | Graph | Go to day |
+|---|---|---|---|
+| Lifts | lifts opened at least once / total | lifts open per day | lifts table |
+| Runs | runs opened at least once / total, by difficulty | runs open per day | runs table |
+| Snow depth | mean depth (season: Dec–Apr only) | depth per day | – |
+| New snow | days it snowed / days from first to last snow (season) or days in the month/week | bars: new snow per day / week / month | – |
+| Base, Summit | mean of daily means (season: Dec–Apr only) | daily mean temperature | – |
+
+New snow amounts are the resort's own reports where it publishes them, otherwise Open-Meteo's
+daily snowfall at the summit. Day view: lifts and runs boxes open that day's table directly. In
+any "go to day" view, ‹ › that cross into another month/week/day also move the period selector,
+and stop at the season's first and last day. Lists below the boxes show each lift's and run's
+status over the period ("28 Nov – present", "Opened on 5 Dec", "Open until 20 Dec", "Open", "Closed").
+
+**The graph** (`docs/graph.js`) shows values over a period (a line, or bars for new snow): hover for a small box with that day's
 details, click to pin it (click elsewhere to close), "Go to specific day" opens that day with
 ‹ › arrows and "Return to graph". Keyboard: ← → move between days, Enter opens the day.
 

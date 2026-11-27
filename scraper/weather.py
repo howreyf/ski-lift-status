@@ -15,6 +15,8 @@ What gets stored, per resort and day:
       summit/base: the day's final min, max and mean temperature
       snow_hours / snowed: how many hours it snowed at the summit, and whether that was
                     3 hours or more
+      snowfall_cm:  the day's total snowfall at the summit (used where the resort doesn't
+                    report new snow itself)
       (the day's snow_outlook is deleted, and hourly values are not kept)
 
 "Final" values are the weather model's best estimate of what happened (from observations
@@ -129,6 +131,9 @@ def temps_record(kind: str, values: dict, elevation: dict) -> dict:
     if kind == "final" and hours is not None:
         record["snow_hours"] = hours
         record["snowed"] = hours >= SNOWED_HOURS
+    snowfall = (values.get("snowfall_cm") or {}).get("summit")
+    if kind == "final" and snowfall is not None:
+        record["snowfall_cm"] = snowfall  # the day's total snowfall at the summit (model)
     return record
 
 

@@ -742,11 +742,11 @@ function liftsTable(lifts, startOpen = false) {
     </details>`;
 }
 
-function runsTable(runs) {
+function runsTable(runs, startOpen = false) {
   if (!runs.length) return `<p class="muted small">Runs: ${NA} (the resort doesn't publish run status).</p>`;
   const open = runs.filter(x => x.status === "open" || x.status === "partial").length;
   return `
-    <details class="detail-table">
+    <details class="detail-table"${startOpen ? " open" : ""}>
       <summary><span class="summary-title">Runs <span class="muted">· ${open} of ${runs.length} open</span></span>
         ${runGradeTotalsHtml(runs)}</summary>
       <table>
