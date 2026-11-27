@@ -66,6 +66,26 @@ def parse(html: str, options: dict) -> dict:
 
 HAPPO_ICONS = {"icon_circle": "open", "icon_triangle": "partial", "icon_cross": "closed"}
 
+# Happo-one's trail status page has no difficulty; it's taken from its trail guide
+# (https://www.happo-one.jp/en/gelande/). Keys: trail names as the status page writes them,
+# lower case. Ranges in the guide become our two-level grades (counted under the harder one);
+# "Upper intermediate - Expert" (Riesen Grat) becomes Expert. Trails the guide doesn't list
+# (cat tracks, park, glamping, Snowland, Kitaone, Lower Usuba, Lower Kokusai, Sakka Wave) stay N/A.
+HAPPO_RUN_LEVELS = {
+    "upper shirakaba south": "Beginner", "lower shirakaba south": "Beginner", "shirakaba north": "Beginner",
+    "sakka south": "Beginner", "sakka north": "Beginner",
+    "nakiyama south": "Beginner/Intermediate", "nakiyama north": "Beginner/Intermediate",
+    "nakiyama wall": "Beginner/Intermediate",          # Nakiyama slope: Intermediate - Upper beginner
+    "panorama course": "Intermediate", "skyline course": "Intermediate",
+    "riesen slalom course": "Intermediate",            # Intermediate - Upper intermediate
+    "central course": "Intermediate/Advanced",         # Advanced - Upper intermediate
+    "usagidaira": "Advanced", "kurobishi": "Advanced",
+    "olympic course i": "Advanced", "olympic course ii": "Advanced",
+    "riesen grat course": "Expert",                    # Upper intermediate - Expert
+    "tenbo course": "Expert", "omusubi": "Expert",
+    "upper urakuro": "Expert", "lower urakuro": "Expert",
+}
+
 
 def parse_runs(html: str, options: dict) -> list[dict]:
     """Run status from the resort's own trail page (runs_url in resorts.yaml):
@@ -111,7 +131,8 @@ def _happo_runs(html: str) -> list[dict]:
             src = (img.get("data-src") or img.get("src") or "") if img else ""
             icon = re.search(r"(icon_[a-z]+)\.svg", src)
             raw = icon.group(1) if icon else ""
-            runs.append(run(name, raw, status=HAPPO_ICONS.get(raw, "unknown")))
+            runs.append(run(name, raw, status=HAPPO_ICONS.get(raw, "unknown"),
+                            level=HAPPO_RUN_LEVELS.get(name.lower())))
     if not runs:
         raise ValueError("No trail table on the Happo-one trail conditions page")
     return runs

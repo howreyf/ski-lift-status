@@ -146,6 +146,11 @@ class TestSpecificLifts(unittest.TestCase):
         self.assertEqual(len(runs), 33)
         self.assertEqual([r["name"] for r in runs if r["status"] == "open"], ["Panorama Course"])
         self.assertTrue(all(r["status"] in ("open", "partial", "closed") for r in runs))
+        levels = {r["name"]: r["level"] for r in runs}
+        self.assertEqual(sum(v != "N/A" for v in levels.values()), 23)  # from the trail guide
+        self.assertEqual((levels["Panorama Course"], levels["Tenbo Course"], levels["Central Course"]),
+                         ("Intermediate", "Expert", "Intermediate/Advanced"))
+        self.assertEqual(levels["Panorama Cat Track"], "N/A")
         with self.assertRaises(ValueError):
             parse_runs("<html></html>", {"runs_page": "happo"})
 
