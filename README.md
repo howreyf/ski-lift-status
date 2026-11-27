@@ -88,7 +88,7 @@ shows old versions.
 
 ## Season months
 
-`season:` in `resorts.yaml` sets the months when data is collected (November–April by default).
+`season:` in `resorts.yaml` sets the months when data is collected (November–May).
 Outside them the daily GitHub run scrapes nothing; instead, on the first run of each month it
 updates `last_checked` in `docs/data/lifts.json` and commits that. GitHub switches off scheduled
 workflows in public repositories after 60 days without activity, and this monthly commit
@@ -123,7 +123,7 @@ seasons.<2026-27>.summary.<id>     lifts_total, runs_total, snow_depth_max_cm, s
 
 `docs/data/seasons/2026-27.json` (one per season, written on one line to keep it small):
 ```
-season                             "2026-27" (seasons run July–June, so Nov–Apr stays in one file)
+season                             "2026-27" (seasons run July–June, so Nov–May stays in one file)
 days[].date                        Japan date, e.g. 2026-11-27
 days[].results.<id>                scraped_at, ok, error (if failed), source_updated, lifts_open, runs_open,
                                    snow_depth_cm, new_snow_cm, temps, snow_outlook (today only),
@@ -171,7 +171,7 @@ non-commercial use, credit shown in the website footer). Code: `scraper/weather.
 - Each morning, today's record gets the **forecast** low/high (`temps.kind = "forecast"`).
 - The next morning that forecast is **replaced** by the day's **final** low/high
   (`temps.kind = "final"`); the forecast isn't kept. Runs look back 7 days, so a missed morning
-  is filled in later, and on 1 May the off-season run still finalises 30 April.
+  is filled in later, and on 1 June the off-season run still finalises 31 May.
 - Today's record also gets a **snow outlook**: the next day with at least 1 cm of snow forecast at
   the summit (up to 16 days ahead), shown as "Next snow in N days". It's deleted once the day is over.
 - Final days also store the day's **mean** temperature and how many **hours it snowed** at the

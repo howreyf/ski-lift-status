@@ -24,7 +24,7 @@
 # small monthly check-in, which keeps GitHub from switching the schedule off.
 season:
   start_month: 11   # November
-  end_month: 4      # April
+  end_month: 5      # May (Niseko and Sapporo Kokusai close on 5 May)
   daily_time: "09:30"   # Japan time: the first run at or after this writes the day's permanent record
 
 resorts:
