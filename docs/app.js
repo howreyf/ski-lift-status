@@ -264,6 +264,33 @@ function baseTempHtml(id) {
   return NA;
 }
 
+// ------------------------------------------------------------------ night skiing (moon symbol)
+
+const MOON_ICON = `<svg class="moon-icon" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z" fill="currentColor"/></svg>`;
+
+/** The resort's night skiing for the season `date` falls in (from resorts.yaml), or null. */
+function nightSkiing(id, date) {
+  const all = state.index.resorts[id]?.night_skiing;
+  return all && date ? all[seasonOf(date)] || null : null;
+}
+
+function nightDescription(ns) {
+  const d = iso => new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-GB", { timeZone: "UTC", day: "numeric", month: "short", year: "numeric" });
+  const period = ns.from ? `${d(ns.from)} – ${ns.to ? d(ns.to) : ns.to_note || "end not announced"}` : ns.to_note || "dates not announced";
+  return [period, ns.hours ? ns.hours.replace("-", "–") : "", ns.note || ""].filter(Boolean).join(" · ");
+}
+
+/** Moon symbol; hovering shows the night skiing dates. `what` = "Night skiing" or "Night skiing lift". */
+function nightIcon(ns, what = "Night skiing") {
+  if (!ns) return "";
+  const text = `${what}: ${nightDescription(ns)}`;
+  return `<span class="night" title="${esc(text)}" role="img" aria-label="${esc(text)}">${MOON_ICON}</span>`;
+}
+
+function isNightLift(ns, l) {
+  return !!ns?.lifts?.some(n => n === l.name_en || n === l.name);
+}
+
 // ------------------------------------------------------------------ resort rows (table and search)
 
 /** Open runs per grade, for the grades this resort has. */
@@ -322,7 +349,7 @@ function resortCells(id, recentlyViewed = false) {
   const info = state.index.resorts[id];
   const r = currentResult(id);
   return `
-    <span class="cell cell-name">${recentlyViewed ? HISTORY_ICON : ""}${esc(info.name)}<span class="cell-note">${esc(info.region)}</span></span>
+    <span class="cell cell-name">${recentlyViewed ? HISTORY_ICON : ""}${esc(info.name)}${nightIcon(nightSkiing(id, state.latestDate))}<span class="cell-note">${esc(info.region)}</span></span>
     <span class="cell" data-label="Lifts open">${liftsHtml(id, r)}</span>
     <span class="cell" data-label="Runs open">${runsHtml(r)}</span>
     <span class="cell" data-label="Base temp" data-base-temp="${esc(id)}">${baseTempHtml(id)}</span>
@@ -538,7 +565,7 @@ function renderDirectory() {
     html += `
       <section class="directory-region">
         <h2>${esc(region)}</h2>
-        <ul>${ids.map(id => `<li><a href="#/resort/${esc(id)}">${esc(state.index.resorts[id].name)}</a></li>`).join("")}</ul>
+        <ul>${ids.map(id => `<li><a href="#/resort/${esc(id)}">${esc(state.index.resorts[id].name)}</a>${nightIcon(nightSkiing(id, state.latestDate))}</li>`).join("")}</ul>
       </section>`;
   }
   view.innerHTML = html + "</div>";
@@ -760,7 +787,7 @@ function difficultyHtml(level) {
   return `<span class="difficulty">${grades.map(g => `<span class="dot grade-${g}"></span>`).join("")}${esc(level)}</span>`;
 }
 
-function liftsTable(lifts, startOpen = false) {
+function liftsTable(lifts, startOpen = false, ns = null) {
   const open = lifts.filter(l => l.status === "open").length;
   return `
     <details class="detail-table"${startOpen ? " open" : ""}>
@@ -770,7 +797,7 @@ function liftsTable(lifts, startOpen = false) {
         <thead><tr><th>Lift</th><th>Status</th><th>Operating hours</th><th>Type</th></tr></thead>
         <tbody>${lifts.map(l => `
           <tr>
-            <td>${esc(l.name_en)}${l.name !== l.name_en ? `<span class="cell-note" lang="ja">${esc(l.name)}</span>` : ""}</td>
+            <td>${esc(l.name_en)}${isNightLift(ns, l) ? nightIcon(ns, "Night skiing lift") : ""}${l.name !== l.name_en ? `<span class="cell-note" lang="ja">${esc(l.name)}</span>` : ""}</td>
             <td><span class="badge s-${esc(l.status)}" title="Resort's wording: ${esc(l.raw)}">${esc(STATUS_LABEL[l.status])}</span></td>
             <td class="num">${esc(l.hours)}</td>
             <td>${typeIcon(l.lift_type)}</td>
@@ -849,7 +876,7 @@ async function renderResortPage(id, date) {
     <nav class="breadcrumb" aria-label="Breadcrumb"><a href="#/resorts">Resorts</a> › <span>${esc(info.name)}</span></nav>
     <div class="resort-head">
       <div>
-        <h1 class="page-title">${esc(info.name)}</h1>
+        <h1 class="page-title">${esc(info.name)}${nightIcon(nightSkiing(id, date))}</h1>
         <p class="resort-links small">
           ${info.website ? `<a href="${esc(info.website)}" target="_blank" rel="noopener">Official website ↗</a> · ` : ""}
           <a href="${esc(info.source_url)}" target="_blank" rel="noopener">Lift status page ↗</a> · ${esc(info.region)}
@@ -869,7 +896,7 @@ async function renderResortPage(id, date) {
     ${!r ? `<p class="warn">No data for this day.</p>` : !r.ok ? `<p class="warn">Couldn't read the resort's page this day.</p>` : ""}
     <div class="boxes">${boxesHtml(id, r, date, isLatest)}</div>
 
-    ${r?.ok ? liftsTable(r.lifts) + runsTable(r.runs || [], false, r.lifts_open) : ""}
+    ${r?.ok ? liftsTable(r.lifts, false, nightSkiing(id, date)) + runsTable(r.runs || [], false, r.lifts_open) : ""}
     ${mapHtml(info)}`;
 
   view.querySelector("button[data-pin]").addEventListener("click", () => {

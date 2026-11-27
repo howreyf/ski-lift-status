@@ -76,6 +76,17 @@ class TestEveryResort(unittest.TestCase):
                 self.assertEqual(r["new_snow_cm"], new, "new snow")
                 self.assertEqual(r["temperature_c"], temp, "temperature")
 
+    def test_night_skiing_lifts_exist(self):
+        """Every lift named under night_skiing in resorts.yaml must match a real lift name."""
+        from scraper.parsers.hakuba_valley import NAMES_EN
+        for r in self.resorts:
+            names = {l["name"] for l in self.results[r["id"]]["lifts"]} | {l["name_en"] for l in self.results[r["id"]]["lifts"]}
+            if r["parser"] == "hakuba_valley":
+                names |= set(NAMES_EN.values())  # Goryu's Iimori lifts are missing from the saved page
+            for season, ns in (r.get("night_skiing") or {}).items():
+                with self.subTest(resort=r["id"], season=season):
+                    self.assertEqual([l for l in ns.get("lifts", []) if l not in names], [])
+
     def test_lift_records_are_well_formed(self):
         for rid, r in self.results.items():
             with self.subTest(resort=rid):

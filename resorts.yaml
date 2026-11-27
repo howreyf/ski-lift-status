@@ -15,6 +15,9 @@
 #   elevation base and summit height in metres (lowest and highest lift-served points, from
 #             the resort's published figures); daily low/high temperatures are for these heights
 #   website   the resort's official website (linked under the name on its page)
+#   night_skiing  (optional) per season: from / to (dates), to_note (if the end isn't a date),
+#             hours, note, lifts (names as shown on the site, English where available).
+#             Shown as a moon symbol beside the resort and those lifts.
 #   map       trail map shown at the bottom of its page: type image (shown on the page),
 #             pdf or page (linked); optional note shown under it
 
@@ -34,6 +37,9 @@ resorts:
     elevation: { base: 260, summit: 1200 }   # metres
     website: https://en.grand-hirafu.jp/
     map: { type: image, url: "https://www.grand-hirafu.jp/snow/status/images/map.webp" }
+    night_skiing:   # from the resort's status page
+      "2026-27": { from: "2026-12-12", to: "2027-03-22",
+                   lifts: ["King Gondola (8-seater)", "King Holiday Pair Lift", "Ace Family Quad Lift"] }
     url: https://www.grand-hirafu.jp/snow/status/
     parser: niseko
     enabled: true
@@ -125,6 +131,10 @@ resorts:
     elevation: { base: 750, summit: 1676 }   # metres
     website: https://www.s-goryu.com/
     map: { type: pdf, url: "https://www.hakubavalley.com/cms/wp-content/uploads/2025/11/25-26_日英並記.pdf" }
+    night_skiing:   # from hakubagoryu.jp night skiing page
+      "2026-27": { from: "2026-12-19", to_note: "mid to late March 2027", hours: "18:00-21:30",
+                   note: "closed 3 Mar 2027 (private event)",
+                   lifts: ["Toomi Sky Four Lift", "Tomi 2nd Chair Lift", "Iimori No.6 Pair Lift"] }
     url: http://hakubavalley.com/en/weather_en/
     parser: hakuba_valley
     runs_url: https://www.hakubagoryu.jp/en/ski-en/gelande/slope-conditions/
@@ -164,6 +174,9 @@ resorts:
     elevation: { base: 565, summit: 1650 }   # metres
     website: https://en.nozawaski.com/
     map: { type: image, url: "https://nozawaski.com/cms/wp-content/themes/nozawa-ski/assets/img/gelande/gelandemap_base2025-26.jpg" }
+    night_skiing:   # from en.nozawaski.com night ski page
+      "2026-27": { from: "2026-12-26", to_note: "end not announced", hours: "16:30-20:00",
+                   lifts: ["Nagasaka Quad"] }
     url: https://en.nozawaski.com/the-mountain/moutain-info/slopes-lifts/
     parser: nozawa
     enabled: true

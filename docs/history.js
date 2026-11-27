@@ -419,7 +419,7 @@ function historyCells(id, recentlyViewed = false) {
   const ls = lastSeasonSummary(id);
   const note = ls ? `<span class="cell-note">${ls.soFar ? `${esc(ls.label)} so far` : `season ${esc(ls.label)}`}</span>` : "";
   return `
-    <span class="cell cell-name">${recentlyViewed ? HISTORY_ICON : ""}${esc(info.name)}<span class="cell-note">${esc(info.region)}</span></span>
+    <span class="cell cell-name">${recentlyViewed ? HISTORY_ICON : ""}${esc(info.name)}${nightIcon(nightSkiing(id, state.latestDate))}<span class="cell-note">${esc(info.region)}</span></span>
     <span class="cell" data-label="Total lifts">${lifts.length ? `<strong>${lifts.length}</strong> lifts` : NA}</span>
     <span class="cell" data-label="Total runs">${runGradeTotalsHtml(r?.runs)}</span>
     <span class="cell" data-label="Mean base temp">${ls?.s?.base_mean_c != null ? `${deg(ls.s.base_mean_c)} °C` : NA}${note}</span>
@@ -438,7 +438,7 @@ function renderHistoryDirectory() {
     html += `
       <section class="directory-region">
         <h2>${esc(region)}</h2>
-        <ul>${ids.map(id => `<li><a href="#/history/${esc(id)}">${esc(state.index.resorts[id].name)}</a></li>`).join("")}</ul>
+        <ul>${ids.map(id => `<li><a href="#/history/${esc(id)}">${esc(state.index.resorts[id].name)}</a>${nightIcon(nightSkiing(id, state.latestDate))}</li>`).join("")}</ul>
       </section>`;
   }
   view.innerHTML = html + "</div>";
@@ -720,7 +720,7 @@ async function mountDayView(id, key, host, ui, opts) {
   const [sStart, sEnd] = periodRange("season", seasonOf(date));
   const table = !r ? `<p class="muted">No record for this day.</p>`
     : !r.ok ? `<p class="muted">Couldn't read the resort's page this day.</p>`
-    : key === "lifts" ? liftsTable(r.lifts, true) : runsTable(r.runs || [], true, r.lifts_open);
+    : key === "lifts" ? liftsTable(r.lifts, true, nightSkiing(id, date)) : runsTable(r.runs || [], true, r.lifts_open);
   host.innerHTML = `
     <div class="dayview-head">
       <div class="dayview-nav">
@@ -818,7 +818,7 @@ function mountExpanded(id, recs, facts) {
 
 // ------------------------------------------------------------------ lists below the boxes
 
-function periodListsHtml(recs, unit, ongoing = false) {
+function periodListsHtml(recs, unit, ongoing = false, ns = null) {
   const ok = recs.filter(x => x.r.ok);
   if (!ok.length) return "";
   const word = unitWord(unit);
@@ -836,7 +836,7 @@ function periodListsHtml(recs, unit, ongoing = false) {
         <thead><tr><th>Lift</th><th>Status this ${word}</th><th>Operating hours</th><th>Type</th></tr></thead>
         <tbody>${lifts.map(({ item: l, days }) => `
           <tr>
-            <td>${esc(l.name_en)}${l.name !== l.name_en ? `<span class="cell-note" lang="ja">${esc(l.name)}</span>` : ""}</td>
+            <td>${esc(l.name_en)}${isNightLift(ns, l) ? nightIcon(ns, "Night skiing lift") : ""}${l.name !== l.name_en ? `<span class="cell-note" lang="ja">${esc(l.name)}</span>` : ""}</td>
             <td>${badge(periodStatus(days, unit, ongoing))}</td>
             <td class="num">${esc(l.hours)}</td>
             <td>${typeIcon(l.lift_type)}</td>
@@ -915,11 +915,11 @@ async function renderHistoryPage(id, unit, value, carry = null) {
     content = `
       ${!r ? `<p class="warn">No record for this day.</p>` : !r.ok ? `<p class="warn">Couldn't read the resort's page this day.</p>` : ""}
       <div class="boxes">${dayBoxes(id, r, value, historyUI)}</div>
-      ${r?.ok ? liftsTable(r.lifts) + runsTable(r.runs || [], false, r.lifts_open) : ""}`;
+      ${r?.ok ? liftsTable(r.lifts, false, nightSkiing(id, value)) + runsTable(r.runs || [], false, r.lifts_open) : ""}`;
   } else {
     content = `
       <div class="boxes">${periodBoxes(id, recs, historyUI)}</div>
-      ${recs.length ? periodListsHtml(recs, unit, todayIso() <= end) : `<p class="muted">No data recorded in this period.</p>`}`;
+      ${recs.length ? periodListsHtml(recs, unit, todayIso() <= end, nightSkiing(id, start)) : `<p class="muted">No data recorded in this period.</p>`}`;
   }
 
   view.innerHTML = `
@@ -927,7 +927,7 @@ async function renderHistoryPage(id, unit, value, carry = null) {
     <nav class="breadcrumb" aria-label="Breadcrumb"><a href="#/history">Historical</a> › <span>${esc(info.name)}</span></nav>
     <div class="resort-head">
       <div>
-        <h1 class="page-title">${esc(info.name)} <span class="badge-historical">Historical</span></h1>
+        <h1 class="page-title">${esc(info.name)}${nightIcon(nightSkiing(id, start))} <span class="badge-historical">Historical</span></h1>
         <p class="resort-links small">
           ${info.website ? `<a href="${esc(info.website)}" target="_blank" rel="noopener">Official website ↗</a> · ` : ""}${esc(info.region)}
         </p>

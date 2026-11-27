@@ -454,6 +454,10 @@ td.num { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .bucket-toggle .seg-btn.is-active { border-color: var(--accent); }
 .pk-arrow:disabled { opacity: .35; cursor: not-allowed; }
 
+/* night skiing moon */
+.night { display: inline-flex; align-items: center; margin-left: 5px; vertical-align: -2px; color: #6b5bd6; cursor: help; }
+@media (prefers-color-scheme: dark) { .night { color: #b3a8ff; } }
+
 /* runs listed as open while no lifts are running */
 .alert-icon { color: var(--warn); flex: none; }
 .alert-inline { display: inline-flex; align-items: center; margin-left: 4px; vertical-align: middle; }
