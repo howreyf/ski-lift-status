@@ -64,11 +64,18 @@ def parse(html: str, options: dict) -> dict:
     }
 
 
+HAPPO_ICONS = {"icon_circle": "open", "icon_triangle": "partial", "icon_cross": "closed"}
+
+
 def parse_runs(html: str, options: dict) -> list[dict]:
-    """Run status from https://www.hakubagoryu.jp/en/ski-en/gelande/slope-conditions/, which
-    covers Goryu (sections "toomi" = Alps Daira / Toomi, and "iimori") and Hakuba 47
-    ("hakuba47"). options.runs_sections picks the sections for this resort.
+    """Run status from the resort's own trail page (runs_url in resorts.yaml):
+      - Goryu and Hakuba 47: https://www.hakubagoryu.jp/en/ski-en/gelande/slope-conditions/
+        sections "toomi" (Alps Daira / Toomi) and "iimori" = Goryu, "hakuba47" = Hakuba 47;
+        options.runs_sections picks them
+      - Happo-one (options.runs_page = happo): https://www.happo-one.jp/en/gelande/trail-conditions/
     Night-ski and sunrise-ski rows are sessions of the same run, so they're skipped."""
+    if options.get("runs_page") == "happo":
+        return _happo_runs(html)
     soup = BeautifulSoup(html, "html.parser")
     runs = []
     for section_id in options.get("runs_sections") or []:
@@ -83,4 +90,28 @@ def parse_runs(html: str, options: dict) -> list[dict]:
             if SESSION_ROW.search(name):
                 continue
             runs.append(run(name, tds[1].get_text()))
+    return runs
+
+
+def _happo_runs(html: str) -> list[dict]:
+    """Happo-one trail table rows: letter | trail | status icon | note. The status is an image:
+    icon_circle = open, icon_triangle = partly closed, icon_cross = closed."""
+    soup = BeautifulSoup(html, "html.parser")
+    runs = []
+    for table in soup.find_all("table"):
+        head = [clean_text(c.get_text()).lower() for c in table.find("tr").find_all(["th", "td"])] if table.find("tr") else []
+        if head[:2] != ["trail", "status"]:
+            continue
+        for tr in table.find_all("tr")[1:]:
+            tds = tr.find_all("td")
+            if len(tds) < 3:
+                continue
+            name = clean_text(tds[1].get_text())
+            img = tds[2].find("img", attrs={"data-src": True}) or tds[2].find("img")
+            src = (img.get("data-src") or img.get("src") or "") if img else ""
+            icon = re.search(r"(icon_[a-z]+)\.svg", src)
+            raw = icon.group(1) if icon else ""
+            runs.append(run(name, raw, status=HAPPO_ICONS.get(raw, "unknown")))
+    if not runs:
+        raise ValueError("No trail table on the Happo-one trail conditions page")
     return runs

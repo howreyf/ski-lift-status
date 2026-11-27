@@ -139,6 +139,16 @@ class TestSpecificLifts(unittest.TestCase):
     def test_hakuba_skips_night_sessions(self):
         self.assertFalse(any("Night" in n for n in self.lifts["hakuba-goryu"]))
 
+    def test_happo_one_runs_from_the_trail_conditions_page(self):
+        from scraper.parsers.hakuba_valley import parse_runs
+        html = (FIXTURES / "happo_trails.html").read_text(encoding="utf-8")  # saved 2026-11-27
+        runs = parse_runs(html, {"runs_page": "happo"})
+        self.assertEqual(len(runs), 33)
+        self.assertEqual([r["name"] for r in runs if r["status"] == "open"], ["Panorama Course"])
+        self.assertTrue(all(r["status"] in ("open", "partial", "closed") for r in runs))
+        with self.assertRaises(ValueError):
+            parse_runs("<html></html>", {"runs_page": "happo"})
+
     def test_teine_run_difficulty_from_course_guide(self):
         from scraper.parsers import sapporo_teine
         runs = sapporo_teine.parse((FIXTURES / "sapporo_teine.html").read_text(encoding="utf-8"), {})["runs"]

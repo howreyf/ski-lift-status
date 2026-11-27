@@ -153,7 +153,8 @@ resorts:
     map: { type: pdf, url: "https://www.hakubavalley.com/cms/wp-content/uploads/2025/11/2025-2026ゲレンデマップen-QR無し.pdf" }
     url: http://hakubavalley.com/en/weather_en/
     parser: hakuba_valley
-    options: { area: happo-one }
+    runs_url: https://www.happo-one.jp/en/gelande/trail-conditions/
+    options: { area: happo-one, runs_page: happo }
     enabled: true
 
   - id: nozawa-onsen
