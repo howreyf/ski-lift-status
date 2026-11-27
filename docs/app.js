@@ -616,16 +616,16 @@ function scale({ lo, hi, value, fillFrom = null, tick = null, loLabel, hiLabel, 
     </div>`;
 }
 
-function liftsBox(id, r) {
+function liftsBox(id, r, more = "") {
   if (!r?.ok) return box("lifts", "Lifts open", `<div class="box-value">${NA}</div>`);
   const total = (r.date === state.latestDate ? seasonSummary(id).lifts_total : null) ?? r.lifts.length;
   const p = pct(r.lifts_open, total);
   return box("lifts", "Lifts open",
     `<div class="box-value">${r.lifts_open} <small>/ ${total}</small></div>
-     <div class="box-note">${Math.round(p)}% open</div>`, p, "fill-green");
+     <div class="box-note">${Math.round(p)}% open</div>${more ? `<div class="box-note box-more">${more}</div>` : ""}`, p, "fill-green");
 }
 
-function runsBox(id, r) {
+function runsBox(id, r, more = "") {
   const runs = r?.runs || [];
   if (!r?.ok || !runs.length) {
     return box("runs", "Runs open", `<div class="box-value">${NA}</div><div class="box-note">Not published by the resort</div>`);
@@ -633,7 +633,7 @@ function runsBox(id, r) {
   const p = pct(r.runs_open, runs.length);
   return box("runs", "Runs open",
     `<div class="box-value">${r.runs_open} <small>/ ${runs.length}</small></div>
-     <div class="box-grades">${runsHtml(r)}</div>${runsAlertHtml(r, true)}`, p, "fill-green");
+     <div class="box-grades">${runsHtml(r)}</div>${runsAlertHtml(r, true)}${more ? `<div class="box-note box-more">${more}</div>` : ""}`, p, "fill-green");
 }
 
 function snowDepthBox(id, r, date, isLatest) {
@@ -790,7 +790,7 @@ function difficultyHtml(level) {
 function liftsTable(lifts, startOpen = false, ns = null) {
   const open = lifts.filter(l => l.status === "open").length;
   return `
-    <details class="detail-table"${startOpen ? " open" : ""}>
+    <details class="detail-table" data-list="lifts"${startOpen ? " open" : ""}>
       <summary><span class="summary-title">Lifts <span class="muted">· ${open} of ${lifts.length} open</span></span>
         ${liftTypeTotalsHtml(lifts)}</summary>
       <table>
@@ -810,7 +810,7 @@ function runsTable(runs, startOpen = false, liftsOpen = null) {
   if (!runs.length) return `<p class="muted small">Runs: ${NA} (the resort doesn't publish run status).</p>`;
   const open = runs.filter(x => x.status === "open" || x.status === "partial").length;
   return `
-    <details class="detail-table"${startOpen ? " open" : ""}>
+    <details class="detail-table" data-list="runs"${startOpen ? " open" : ""}>
       <summary><span class="summary-title">Runs <span class="muted">· ${open} of ${runs.length} open</span>
         ${runsAlertHtml({ ok: true, lifts_open: liftsOpen, runs_open: open })}</span>
         ${runGradeTotalsHtml(runs)}</summary>
@@ -902,6 +902,28 @@ async function renderResortPage(id, date) {
   view.querySelector("button[data-pin]").addEventListener("click", () => {
     if (pins.toggle(id)) renderResortPage(id, isLatest ? null : date);
   });
+  linkBoxesToLists();
+}
+
+/** Present page: clicking the Lifts / Runs box opens its dropdown below and scrolls to it. */
+function linkBoxesToLists() {
+  for (const key of ["lifts", "runs"]) {
+    const boxEl = view.querySelector(`.boxes [data-box="${key}"]`);
+    const list = view.querySelector(`details[data-list="${key}"]`);
+    if (!boxEl || !list) continue;
+    boxEl.classList.add("box-clickable");
+    boxEl.setAttribute("role", "button");
+    boxEl.setAttribute("tabindex", "0");
+    boxEl.querySelector(".box-body").insertAdjacentHTML("beforeend",
+      `<div class="box-note box-more">See all ${key} ›</div>`);
+    const go = () => {
+      list.open = true;
+      list.scrollIntoView({ behavior: "smooth", block: "start" });
+      list.querySelector("summary")?.focus({ preventScroll: true });
+    };
+    boxEl.addEventListener("click", go);
+    boxEl.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+  }
 }
 
 // ------------------------------------------------------------------ router

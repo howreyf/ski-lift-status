@@ -653,7 +653,8 @@ function dayBoxes(id, r, date, ui) {
   }
   const clickable = (html, key) => html.replace(`data-box="${key}"`, `data-box="${key}" role="button" tabindex="0" aria-expanded="false"`)
     .replace(`class="box `, `class="box box-clickable `);
-  let liftsHtml = liftsBox(id, r), runsHtml = runsBox(id, r);
+  let liftsHtml = liftsBox(id, r, r?.ok ? "View this day's lifts ›" : ""),
+    runsHtml = runsBox(id, r, r?.ok && r.runs?.length ? "View this day's runs ›" : "");
   if (r?.ok) liftsHtml = clickable(liftsHtml, "lifts");
   if (r?.ok && r.runs?.length) runsHtml = clickable(runsHtml, "runs");
   return liftsHtml + runsHtml + snowDepthBox(id, r, date, false) + newSnowBox(id, r, date, false)
