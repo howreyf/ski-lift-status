@@ -231,10 +231,31 @@ async function fetchLive() {
   refreshLiveBoxes();
 }
 
+/** "(12 min ago)" for a live reading. Open-Meteo gives Japan time without a zone, e.g.
+ *  "2026-11-27T15:15" (the 15-minute slot the value is for). Updated every minute by tickAgo(). */
+function agoText(jstTime) {
+  const t = Date.parse(`${jstTime}:00+09:00`);
+  if (Number.isNaN(t)) return "";
+  const min = Math.max(0, Math.round((Date.now() - t) / 60000));
+  if (min < 1) return "(just now)";
+  if (min < 60) return `(${min} min ago)`;
+  const h = Math.floor(min / 60), m = min % 60;
+  return `(${h} h${m ? ` ${m} min` : ""} ago)`;
+}
+
+function agoHtml(jstTime) {
+  if (!jstTime) return "";
+  return `<span class="ago" data-time="${esc(jstTime)}" title="Updated ${esc(jstTime.replace("T", " "))} JST">${agoText(jstTime)}</span>`;
+}
+
+function tickAgo() {
+  document.querySelectorAll(".ago[data-time]").forEach(el => { el.textContent = agoText(el.dataset.time); });
+}
+
 /** Base temperature for the table: live if we have it, otherwise today's forecast low / high. */
 function baseTempHtml(id) {
   const live = state.live[id]?.base;
-  if (live) return `${deg(live.temp)} °C<span class="cell-note">live</span>`;
+  if (live) return `${deg(live.temp)} °C<span class="cell-note">live ${agoHtml(live.time)}</span>`;
   const t = todayResult(id)?.temps;
   if (t?.base) {
     const note = t.kind === "forecast" ? "forecast low / high" : "low / high";
@@ -673,7 +694,7 @@ function tempBox(id, level, r, date, isLatest) {
   if (isLatest) {
     const live = state.live[id]?.[level];
     below = live
-      ? `<div class="box-note">Live: <strong>${deg(live.temp)} °C</strong></div>
+      ? `<div class="box-note">Live: <strong>${deg(live.temp)} °C</strong> ${agoHtml(live.time)}</div>
          ${scale({ lo: t.min_c, hi: t.max_c, value: live.temp, loLabel: `${deg(t.min_c)}°`, hiLabel: `${deg(t.max_c)}°`,
                    valueLabel: `Live ${deg(live.temp)} °C` })}`
       : `<div class="box-note">Live: loading…</div>`;
@@ -916,6 +937,7 @@ async function start() {
   setInterval(() => loadLiveStatus(true), STATUS_REFRESH_MS);
   fetchLive();
   setInterval(fetchLive, LIVE_REFRESH_MS);
+  setInterval(tickAgo, 60 * 1000); // keep "(x min ago)" current
 }
 
 start();
