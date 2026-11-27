@@ -258,6 +258,7 @@ class TestSaving(unittest.TestCase):
             "summit_min_c": None, "summit_max_c": None, "base_min_c": None, "base_max_c": None,
             "summit_lowest_mean_c": None, "summit_highest_mean_c": None,
             "base_lowest_mean_c": None, "base_highest_mean_c": None,
+            "summit_mean_c": None, "base_mean_c": None, "snow_depth_mean_cm": 70.0,
             "new_snow_min_cm": 0, "new_snow_max_cm": 15, "new_snow_mean_cm": 6.3,
             "days_recorded": 3,
         })

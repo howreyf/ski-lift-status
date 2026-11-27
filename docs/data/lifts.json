@@ -22,6 +22,12 @@
    "elevation_m": {
     "summit": 1200,
     "base": 260
+   },
+   "season_dates": {
+    "2026-27": {
+     "open": "2026-11-28",
+     "close": "2027-05-05"
+    }
    }
   },
   "kiroro": {
@@ -78,6 +84,11 @@
    "elevation_m": {
     "summit": 1074,
     "base": 235
+   },
+   "season_dates": {
+    "2026-27": {
+     "open": "2026-11-28"
+    }
    }
   },
   "tomamu": {
@@ -96,6 +107,11 @@
    "elevation_m": {
     "summit": 1171,
     "base": 586
+   },
+   "season_dates": {
+    "2026-27": {
+     "open": "2026-12-01"
+    }
    }
   },
   "sapporo-kokusai": {
@@ -114,6 +130,12 @@
    "elevation_m": {
     "summit": 1100,
     "base": 630
+   },
+   "season_dates": {
+    "2026-27": {
+     "open": "2026-11-20",
+     "close": "2027-05-05"
+    }
    }
   },
   "sapporo-teine": {
@@ -285,7 +307,10 @@
      "base_highest_mean_c": null,
      "new_snow_min_cm": 0,
      "new_snow_max_cm": 0,
-     "new_snow_mean_cm": 0.0
+     "new_snow_mean_cm": 0.0,
+     "summit_mean_c": null,
+     "base_mean_c": null,
+     "snow_depth_mean_cm": 40.0
     },
     "niseko-hirafu": {
      "lifts_total": 9,
@@ -303,7 +328,10 @@
      "base_highest_mean_c": null,
      "new_snow_min_cm": 0,
      "new_snow_max_cm": 0,
-     "new_snow_mean_cm": 0.0
+     "new_snow_mean_cm": 0.0,
+     "summit_mean_c": null,
+     "base_mean_c": null,
+     "snow_depth_mean_cm": 110.0
     },
     "kiroro": {
      "lifts_total": 9,
@@ -321,7 +349,10 @@
      "base_highest_mean_c": null,
      "new_snow_min_cm": 0,
      "new_snow_max_cm": 0,
-     "new_snow_mean_cm": 0.0
+     "new_snow_mean_cm": 0.0,
+     "summit_mean_c": null,
+     "base_mean_c": null,
+     "snow_depth_mean_cm": 100.0
     },
     "rusutsu": {
      "lifts_total": 18,
@@ -339,7 +370,10 @@
      "base_highest_mean_c": null,
      "new_snow_min_cm": null,
      "new_snow_max_cm": null,
-     "new_snow_mean_cm": null
+     "new_snow_mean_cm": null,
+     "summit_mean_c": null,
+     "base_mean_c": null,
+     "snow_depth_mean_cm": null
     },
     "furano": {
      "lifts_total": 11,
@@ -357,7 +391,10 @@
      "base_highest_mean_c": null,
      "new_snow_min_cm": 2,
      "new_snow_max_cm": 2,
-     "new_snow_mean_cm": 2.0
+     "new_snow_mean_cm": 2.0,
+     "summit_mean_c": null,
+     "base_mean_c": null,
+     "snow_depth_mean_cm": 65.0
     },
     "tomamu": {
      "lifts_total": 6,
@@ -375,7 +412,10 @@
      "base_highest_mean_c": null,
      "new_snow_min_cm": 0,
      "new_snow_max_cm": 0,
-     "new_snow_mean_cm": 0.0
+     "new_snow_mean_cm": 0.0,
+     "summit_mean_c": null,
+     "base_mean_c": null,
+     "snow_depth_mean_cm": 50.0
     },
     "sapporo-kokusai": {
      "lifts_total": 5,
@@ -393,7 +433,10 @@
      "base_highest_mean_c": null,
      "new_snow_min_cm": null,
      "new_snow_max_cm": null,
-     "new_snow_mean_cm": null
+     "new_snow_mean_cm": null,
+     "summit_mean_c": null,
+     "base_mean_c": null,
+     "snow_depth_mean_cm": null
     },
     "sapporo-teine": {
      "lifts_total": 10,
@@ -411,7 +454,10 @@
      "base_highest_mean_c": null,
      "new_snow_min_cm": 1,
      "new_snow_max_cm": 1,
-     "new_snow_mean_cm": 1.0
+     "new_snow_mean_cm": 1.0,
+     "summit_mean_c": null,
+     "base_mean_c": null,
+     "snow_depth_mean_cm": 50.0
     },
     "shiga-kogen": {
      "lifts_total": 49,
@@ -429,7 +475,10 @@
      "base_highest_mean_c": null,
      "new_snow_min_cm": 15,
      "new_snow_max_cm": 15,
-     "new_snow_mean_cm": 15.0
+     "new_snow_mean_cm": 15.0,
+     "summit_mean_c": null,
+     "base_mean_c": null,
+     "snow_depth_mean_cm": null
     },
     "hakuba-goryu": {
      "lifts_total": 11,
@@ -447,7 +496,10 @@
      "base_highest_mean_c": null,
      "new_snow_min_cm": null,
      "new_snow_max_cm": null,
-     "new_snow_mean_cm": null
+     "new_snow_mean_cm": null,
+     "summit_mean_c": null,
+     "base_mean_c": null,
+     "snow_depth_mean_cm": 105.0
     },
     "hakuba-47": {
      "lifts_total": 5,
@@ -465,7 +517,10 @@
      "base_highest_mean_c": null,
      "new_snow_min_cm": null,
      "new_snow_max_cm": null,
-     "new_snow_mean_cm": null
+     "new_snow_mean_cm": null,
+     "summit_mean_c": null,
+     "base_mean_c": null,
+     "snow_depth_mean_cm": 105.0
     },
     "hakuba-happo-one": {
      "lifts_total": 19,
@@ -483,7 +538,10 @@
      "base_highest_mean_c": null,
      "new_snow_min_cm": null,
      "new_snow_max_cm": null,
-     "new_snow_mean_cm": null
+     "new_snow_mean_cm": null,
+     "summit_mean_c": null,
+     "base_mean_c": null,
+     "snow_depth_mean_cm": 124.0
     },
     "nozawa-onsen": {
      "lifts_total": 16,
@@ -501,7 +559,10 @@
      "base_highest_mean_c": null,
      "new_snow_min_cm": null,
      "new_snow_max_cm": null,
-     "new_snow_mean_cm": null
+     "new_snow_mean_cm": null,
+     "summit_mean_c": null,
+     "base_mean_c": null,
+     "snow_depth_mean_cm": null
     },
     "gala-yuzawa": {
      "lifts_total": 10,
@@ -519,7 +580,10 @@
      "base_highest_mean_c": null,
      "new_snow_min_cm": null,
      "new_snow_max_cm": null,
-     "new_snow_mean_cm": null
+     "new_snow_mean_cm": null,
+     "summit_mean_c": null,
+     "base_mean_c": null,
+     "snow_depth_mean_cm": null
     }
    }
   }

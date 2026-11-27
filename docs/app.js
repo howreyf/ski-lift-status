@@ -361,7 +361,10 @@ function searchHtml() {
     </div>`;
 }
 
-function setupSearch(root) {
+const PRESENT_SEARCH = { cells: (id, recentlyViewed) => resortCells(id, recentlyViewed), href: id => `#/resort/${id}` };
+
+/** `opts`: which cells to show in the suggestions and where they link (present or Historical tab). */
+function setupSearch(root, opts = PRESENT_SEARCH) {
   const box = root.querySelector(".search");
   if (!box) return;
   const input = box.querySelector(".search-input");
@@ -376,7 +379,7 @@ function setupSearch(root) {
     list.innerHTML = items.length
       ? items.map((id, i) => `
           <a class="search-option${i === active ? " is-active" : ""}" role="option" id="opt-${esc(id)}"
-            aria-selected="${i === active}" href="#/resort/${esc(id)}">${resortCells(id, recentIds.includes(id))}</a>`).join("")
+            aria-selected="${i === active}" href="${esc(opts.href(id))}" data-id="${esc(id)}">${opts.cells(id, recentIds.includes(id))}</a>`).join("")
       : `<div class="search-empty">No resort matches “${esc(input.value)}”.</div>`;
     list.hidden = false;
     input.setAttribute("aria-expanded", "true");
@@ -392,7 +395,7 @@ function setupSearch(root) {
   function go(id) {
     close();
     input.value = "";
-    location.hash = `#/resort/${id}`;
+    location.hash = opts.href(id);
   }
 
   input.addEventListener("focus", render);
@@ -417,7 +420,7 @@ function setupSearch(root) {
   list.addEventListener("mousedown", e => e.preventDefault());
   list.addEventListener("click", e => {
     const opt = e.target.closest(".search-option");
-    if (opt) { e.preventDefault(); go(opt.getAttribute("href").split("/").pop()); }
+    if (opt) { e.preventDefault(); go(opt.dataset.id); }
   });
   input.addEventListener("blur", close);
 }
@@ -692,7 +695,7 @@ function refreshLiveBoxes() {
   }
 }
 
-function typeIcon(type) {
+function typeIcon(type, compact = false) {
   const seats = SEATS[type];
   let svg;
   if (type === "Gondola") {
@@ -710,8 +713,8 @@ function typeIcon(type) {
   } else {
     return `<span class="muted">${NA}</span>`;
   }
-  return `<span class="type"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">${svg}</svg>${
-    seats ? `<span class="seats" title="${seats}-seat">${seats}</span>` : ""}<span>${esc(TYPE_LABEL[type] || type)}</span></span>`;
+  return `<span class="type${compact ? " type-compact" : ""}"${compact ? ` title="${esc(TYPE_LABEL[type] || type)}"` : ""}><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">${svg}</svg>${
+    seats ? `<span class="seats" title="${seats}-seat">${seats}</span>` : ""}${compact ? "" : `<span>${esc(TYPE_LABEL[type] || type)}</span>`}</span>`;
 }
 
 function difficultyHtml(level) {
@@ -720,11 +723,12 @@ function difficultyHtml(level) {
   return `<span class="difficulty">${grades.map(g => `<span class="dot grade-${g}"></span>`).join("")}${esc(level)}</span>`;
 }
 
-function liftsTable(lifts) {
+function liftsTable(lifts, startOpen = false) {
   const open = lifts.filter(l => l.status === "open").length;
   return `
-    <details class="detail-table">
-      <summary>Lifts <span class="muted">· ${open} of ${lifts.length} open</span></summary>
+    <details class="detail-table"${startOpen ? " open" : ""}>
+      <summary><span class="summary-title">Lifts <span class="muted">· ${open} of ${lifts.length} open</span></span>
+        ${liftTypeTotalsHtml(lifts)}</summary>
       <table>
         <thead><tr><th>Lift</th><th>Status</th><th>Operating hours</th><th>Type</th></tr></thead>
         <tbody>${lifts.map(l => `
@@ -743,7 +747,8 @@ function runsTable(runs) {
   const open = runs.filter(x => x.status === "open" || x.status === "partial").length;
   return `
     <details class="detail-table">
-      <summary>Runs <span class="muted">· ${open} of ${runs.length} open</span></summary>
+      <summary><span class="summary-title">Runs <span class="muted">· ${open} of ${runs.length} open</span></span>
+        ${runGradeTotalsHtml(runs)}</summary>
       <table>
         <thead><tr><th>Run</th><th>Status</th><th>Difficulty</th></tr></thead>
         <tbody>${runs.map(x => `
@@ -812,8 +817,11 @@ async function renderResortPage(id, date) {
           <a href="${esc(info.source_url)}" target="_blank" rel="noopener">Lift status page ↗</a> · ${esc(info.region)}
         </p>
       </div>
-      <button class="pin pin-large${pins.has(id) ? " is-pinned" : ""}" type="button" data-pin="${esc(id)}"
-        aria-pressed="${pins.has(id)}">${pinIcon(pins.has(id))}<span>${pins.has(id) ? "Pinned" : "Pin"}</span></button>
+      <div class="head-buttons">
+        <a class="button button-secondary" href="#/history/${esc(id)}">Switch to historical</a>
+        <button class="pin pin-large${pins.has(id) ? " is-pinned" : ""}" type="button" data-pin="${esc(id)}"
+          aria-pressed="${pins.has(id)}">${pinIcon(pins.has(id))}<span>${pins.has(id) ? "Pinned" : "Pin"}</span></button>
+      </div>
     </div>
     <p class="muted small date-line">${isLatest
       ? `${r?.liveStatus ? `${statusTimeHtml()}<br>` : ""}Snow depth, new snow and weather: <strong>${esc(formatDay(date))}</strong>`
@@ -835,14 +843,16 @@ async function renderResortPage(id, date) {
 
 function route(scrollTop = true) {
   const path = location.hash.replace(/^#\/?/, "");
-  const [page, id, date] = path.split("/");
-  const tab = page === "resorts" || page === "resort" ? "resorts" : "home";
+  const [page, id, date, value] = path.split("/");
+  const tab = page === "resorts" || page === "resort" ? "resorts" : page === "history" ? "history" : "home";
   document.querySelectorAll(".tabs a").forEach(a => {
     if (a.dataset.tab === tab) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");
   });
   currentPage = null;
-  if (page === "resort" && id) renderResortPage(decodeURIComponent(id), /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : null);
+  if (page !== "history" && historyUI) { historyUI.graph?.destroy(); historyUI = null; }
+  if (page === "history") id ? renderHistoryPage(decodeURIComponent(id), date, value) : renderHistoryDirectory();
+  else if (page === "resort" && id) renderResortPage(decodeURIComponent(id), /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : null);
   else if (page === "resorts") renderDirectory();
   else renderHome();
   if (scrollTop) window.scrollTo(0, 0);
@@ -876,6 +886,7 @@ async function start() {
       state.latestDay = season.days[season.days.length - 1] || null;
       state.latestDate = state.latestDay?.date || null;
     }
+    if (IS_DEMO) injectDemoSeason();
   } catch (err) {
     view.innerHTML = `<p class="error">Couldn't load the data (${esc(err.message)}).</p>
       <p class="muted small">If you opened this file directly, run <code>python -m http.server -d docs</code>

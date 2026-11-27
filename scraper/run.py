@@ -250,6 +250,13 @@ def update_summary(summary: dict, season: dict, resort_id: str, result: dict | N
     summary.pop("temperature_min_c", None)  # older format (morning readings), replaced by the above
     summary.pop("temperature_max_c", None)
 
+    # Season averages (shown in the Historical tab's search): mean of the daily means, and
+    # mean snow depth.
+    for level in LEVELS:
+        means = [t[level]["mean_c"] for t in finals if level in t and t[level].get("mean_c") is not None]
+        summary[f"{level}_mean_c"] = round(sum(means) / len(means), 1) if means else None
+    summary["snow_depth_mean_cm"] = round(sum(v for v, _ in depths) / len(depths), 1) if depths else None
+
     # New snow reported by the resort: smallest, largest and average daily amount this season.
     new = [r["new_snow_cm"] for _, r in days if r.get("new_snow_cm") is not None]
     summary["new_snow_min_cm"] = min(new) if new else None
@@ -432,6 +439,10 @@ def main(argv: list[str] | None = None) -> int:
                 "source_url": resort["url"],
                 **({"website": resort["website"]} if resort.get("website") else {}),
                 **({"map": resort["map"]} if resort.get("map") else {}),
+                # Officially announced opening/closing days per season, where known.
+                **({"season_dates": {str(k): {kk: str(vv) for kk, vv in v.items()}
+                                     for k, v in resort["season_dates"].items()}}
+                   if resort.get("season_dates") else {}),
                 # Position and heights: the website uses them to fetch live temperatures.
                 **({"location": {"lat": resort["location"]["lat"], "lon": resort["location"]["lon"]},
                     "elevation_m": {level: resort["elevation"][level] for level in LEVELS}}

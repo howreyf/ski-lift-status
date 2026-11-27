@@ -40,6 +40,20 @@ Plain HTML/CSS/JavaScript, no build step. Pages (the part after `#` in the addre
 | Resorts | `#/resorts` | Search and a directory of all resorts by region |
 | One resort | `#/resort/<id>` | Boxes (lifts, runs, snow depth, new snow, base and summit temperature), lifts and runs lists, trail map |
 | One resort, past day | `#/resort/<id>/<YYYY-MM-DD>` | The same for a historical record (final temperatures, day's mean vs season) |
+| Historical | `#/history` | Search (season totals: lifts, runs by difficulty, mean base temperature and snow depth) and a directory |
+| A resort's history | `#/history/<id>/<unit>/<value>` | unit = `season` (2026-27), `month` (2026-12), `week` (the Sunday it starts) or `day`; period picker with search and ‹ › arrows; opening/closing day and first/last snow; lifts box that expands to the graph |
+
+**The graph** (`docs/graph.js`) shows one value per day: hover for a small box with that day's
+details, click to pin it (click elsewhere to close), "Go to specific day" opens that day with
+‹ › arrows and "Return to graph". Keyboard: ← → move between days, Enter opens the day.
+
+**Demo mode:** add `?demo` before the `#` (e.g. `.../ski-lift-status/?demo#/history/niseko-hirafu`)
+to fill in a made-up 2025-26 season for trying the Historical tab. It's only in the browser and
+never saved; pages show a "Demo mode" banner.
+
+**Opening and closing day:** the official dates from `season_dates` in `resorts.yaml` where known,
+otherwise the first and last day any lift was running. First and last snow: days with snow at the
+summit (Open-Meteo) or new snow reported by the resort.
 
 - Table columns: lifts open / total · runs open by grade (green, red, black, orange = expert,
   grey = level not published; partly open counts as open; two-level runs count under the harder
