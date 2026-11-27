@@ -236,6 +236,15 @@ class TestSaving(unittest.TestCase):
         self.assertTrue(season["days"][0]["results"]["a"]["ok"])
         self.assertNotIn("_lifts_total", season["days"][0]["results"]["a"])
 
+    def test_rerun_with_fewer_lifts_keeps_earlier_result(self):
+        lift = {"name": "x", "status": "open"}
+        season = {"season": "2026-27", "days": []}
+        store_result(season, "2026-12-01", "a", dict(self.ok(50, -3), lifts=[lift] * 11))
+        partial = dict(self.ok(50, -3), lifts=[lift] * 4, _lifts_total=4)
+        store_result(season, "2026-12-01", "a", partial)
+        self.assertEqual(len(season["days"][0]["results"]["a"]["lifts"]), 11)
+        self.assertEqual(partial["_lifts_total"], 11)  # season total isn't lowered either
+
     def test_season_summary(self):
         season = {"season": "2026-27", "days": []}
         for date, depth, temp in [("2026-12-01", 50, -3), ("2026-12-02", 80, -10), ("2026-12-03", 80, 2)]:
@@ -245,7 +254,9 @@ class TestSaving(unittest.TestCase):
         self.assertEqual(summary, {
             "lifts_total": 7, "runs_total": 10,
             "snow_depth_max_cm": 80, "snow_depth_max_date": "2026-12-02",
-            "temperature_min_c": -10, "temperature_max_c": 2, "days_recorded": 3,
+            # No daily low/high temperatures recorded in this test (see TestTemperatures).
+            "summit_min_c": None, "summit_max_c": None, "base_min_c": None, "base_max_c": None,
+            "days_recorded": 3,
         })
 
     def test_season_file_is_compact_and_round_trips(self):
@@ -270,6 +281,79 @@ class TestSeasonMonths(unittest.TestCase):
         self.assertTrue(monthly_check_in(index, "2027-06-01T09:17:00+09:00"))   # new month: check in
         self.assertEqual(index["last_checked"], "2027-06-01T09:17:00+09:00")
         self.assertTrue(monthly_check_in({"last_checked": None}, "2027-06-01T09:17:00+09:00"))
+
+
+class TestTemperatures(unittest.TestCase):
+    """Forecast for today, final values for past days (scraper/weather.py)."""
+
+    RESORT = {"id": "a", "location": {"lat": 1, "lon": 2}, "elevation": {"summit": 1200, "base": 260}}
+
+    def season(self, *dates):
+        return {"season": "2026-27", "days": [{"date": d, "results": {"a": {"ok": True}}} for d in dates]}
+
+    def values(self, lo, hi):
+        return {"summit": {"min_c": lo, "max_c": hi}, "base": {"min_c": lo + 5, "max_c": hi + 5}}
+
+    def test_parse_open_meteo_response(self):
+        from scraper.weather import parse_response
+        points = [(self.RESORT, "summit"), (self.RESORT, "base")]
+        data = [
+            {"daily": {"time": ["2026-11-26", "2026-11-27"], "temperature_2m_min": [-13.3, -11.4], "temperature_2m_max": [-1.6, 1.0]}},
+            {"daily": {"time": ["2026-11-26", "2026-11-27"], "temperature_2m_min": [-7.2, None], "temperature_2m_max": [4.5, 7.1]}},
+        ]
+        out = parse_response(data, points)
+        self.assertEqual(out["a"]["2026-11-26"], {"summit": {"min_c": -13.3, "max_c": -1.6}, "base": {"min_c": -7.2, "max_c": 4.5}})
+        self.assertEqual(out["a"]["2026-11-27"], {"summit": {"min_c": -11.4, "max_c": 1.0}})  # missing value skipped
+        with self.assertRaises(ValueError):
+            parse_response(data[:1], points)
+
+    def test_today_forecast_then_final_next_day(self):
+        from scraper.weather import apply_temps
+        season = self.season("2026-11-27")
+        apply_temps(season, self.RESORT, {"2026-11-27": self.values(-11.4, 1.0)}, today="2026-11-27")
+        t = season["days"][0]["results"]["a"]["temps"]
+        self.assertEqual(t["kind"], "forecast")
+        self.assertEqual(t["summit"], {"elevation_m": 1200, "min_c": -11.4, "max_c": 1.0})
+        self.assertEqual(t["base"]["elevation_m"], 260)
+
+        # Next morning: yesterday's forecast is replaced by the final values.
+        season["days"].append({"date": "2026-11-28", "results": {"a": {"ok": True}}})
+        changed = apply_temps(season, self.RESORT, {"2026-11-27": self.values(-13.0, 0.5),
+                                                    "2026-11-28": self.values(-9.0, 2.0)}, today="2026-11-28")
+        self.assertEqual(changed, ["2026-11-27", "2026-11-28"])
+        y = season["days"][0]["results"]["a"]["temps"]
+        self.assertEqual((y["kind"], y["summit"]["min_c"], y["summit"]["max_c"]), ("final", -13.0, 0.5))
+        self.assertEqual(season["days"][1]["results"]["a"]["temps"]["kind"], "forecast")
+
+    def test_final_values_are_not_overwritten_and_missed_days_catch_up(self):
+        from scraper.weather import apply_temps
+        season = self.season("2026-11-25", "2026-11-26", "2026-11-28")
+        apply_temps(season, self.RESORT, {"2026-11-25": self.values(-5, 0)}, today="2026-11-26")
+        # A later run sees slightly different numbers for the 25th: the final values stay.
+        changed = apply_temps(season, self.RESORT, {"2026-11-25": self.values(-6, 1),
+                                                    "2026-11-26": self.values(-7, 2),
+                                                    "2026-11-27": self.values(-8, 3)}, today="2026-11-28")
+        self.assertEqual(changed, ["2026-11-26"])  # 27th wasn't recorded (no run that day): skipped
+        self.assertEqual(season["days"][0]["results"]["a"]["temps"]["summit"]["min_c"], -5)
+
+    def test_season_summary_uses_final_temperatures_only(self):
+        from scraper.weather import apply_temps
+        season = self.season("2026-12-01", "2026-12-02", "2026-12-03")
+        apply_temps(season, self.RESORT, {"2026-12-01": self.values(-10, 0), "2026-12-02": self.values(-4, 3),
+                                          "2026-12-03": self.values(-30, 20)}, today="2026-12-03")
+        summary = {}
+        update_summary(summary, season, "a", None)
+        # The 3rd is only a forecast, so its -30/20 don't count.
+        self.assertEqual((summary["summit_min_c"], summary["summit_max_c"]), (-10, 3))
+        self.assertEqual((summary["base_min_c"], summary["base_max_c"]), (-5, 8))
+
+    def test_pending_forecast_detection(self):
+        from scraper.run import has_pending_forecasts
+        from scraper.weather import apply_temps
+        season = self.season("2027-04-30")
+        apply_temps(season, self.RESORT, {"2027-04-30": self.values(-3, 5)}, today="2027-04-30")
+        self.assertTrue(has_pending_forecasts(season, "2027-05-01"))   # 1 May: finish 30 April
+        self.assertFalse(has_pending_forecasts(season, "2027-05-20"))  # too old to look up
 
 
 if __name__ == "__main__":

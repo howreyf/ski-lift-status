@@ -110,29 +110,57 @@ function renderOverview(regions, record, season) {
       const total = season[id]?.lifts_total ?? r?.lifts?.length;
       let cells;
       if (!r) {
-        cells = `<td colspan="5" class="muted">No data</td>`;
+        cells = `<td colspan="4" class="muted">No data</td>`;
       } else if (!r.ok) {
-        cells = `<td colspan="5" class="warn">Couldn't read page</td>`;
+        cells = `<td colspan="4" class="warn">Couldn't read page</td>`;
       } else {
         const runs = r.runs_open === null || r.runs_open === undefined ? NA : `${r.runs_open} / ${num(season[id]?.runs_total)}`;
         cells = `
           <td class="num"><strong>${r.lifts_open}</strong> / ${total}</td>
           <td class="num">${runs}</td>
           <td class="num">${num(r.snow_depth_cm, " cm")}</td>
-          <td class="num hide-sm">${num(r.new_snow_cm, " cm")}</td>
-          <td class="num hide-sm">${num(r.temperature_c, " °C")}</td>`;
+          <td class="num hide-sm">${num(r.new_snow_cm, " cm")}</td>`;
       }
+      // Temperatures come from Open-Meteo, so they're there even if the resort's page failed.
+      cells += `
+          <td class="num hide-sm">${lowHigh(r?.temps?.summit)}</td>
+          <td class="num hide-sm">${lowHigh(r?.temps?.base)}</td>`;
       rows += `<tr><td><a href="#resort-${esc(id)}">${esc(info.name)}</a><span class="ja">${esc(region)}</span></td>${cells}</tr>`;
     }
   }
+  const kinds = new Set(Object.values(record?.results || {}).map(r => r.temps?.kind).filter(Boolean));
+  const tempNote = kinds.has("forecast")
+    ? "Summit and base temperatures are today's <strong>forecast</strong> low / high; they're replaced by the final values tomorrow."
+    : kinds.has("final") ? "Summit and base temperatures are the day's final low / high." : "";
   return `
     <section class="card overview">
       <table>
         <thead><tr><th>Resort</th><th>Lifts open</th><th>Runs open</th><th>Snow depth</th>
-          <th class="hide-sm">New snow</th><th class="hide-sm">Temp.</th></tr></thead>
+          <th class="hide-sm">New snow</th><th class="hide-sm">Summit °C<br><small>low / high</small></th>
+          <th class="hide-sm">Base °C<br><small>low / high</small></th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
+      ${tempNote ? `<p class="muted small hide-sm">${tempNote}</p>` : ""}
     </section>`;
+}
+
+/** 1 -> "1.0", -11.4 -> "-11.4" (temperatures always with one decimal) */
+function deg(v) {
+  return Number(v).toFixed(1);
+}
+
+/** {min_c, max_c} -> "-11.4 / 1.0" */
+function lowHigh(t) {
+  return t ? `${deg(t.min_c)} / ${deg(t.max_c)}` : NA;
+}
+
+/** Stat box for one height: "Summit 1,200 m" / "-11.4 to 1.0 °C" / "forecast". */
+function tempStat(level, t, fallbackElevation, kind) {
+  const elevation = t?.elevation_m ?? fallbackElevation;
+  const label = `${level}${elevation ? ` ${Number(elevation).toLocaleString("en-GB")} m` : ""}`;
+  if (!t) return stat(label, NA);
+  const note = kind === "forecast" ? "forecast" : "day's low / high";
+  return stat(label, `${deg(t.min_c)} <small>to</small> ${deg(t.max_c)} <small>°C</small><div class="stat-note">${note}</div>`);
 }
 
 function renderResort(id, info, result, seasonInfo, day) {
@@ -163,13 +191,16 @@ function renderResort(id, info, result, seasonInfo, day) {
       ${stat("Runs open", runs)}
       ${stat("Snow depth", num(result.snow_depth_cm, " cm"))}
       ${stat("New snow", num(result.new_snow_cm, " cm"))}
-      ${stat("Temperature", num(result.temperature_c, " °C"))}
+      ${tempStat("Summit", result.temps?.summit, info.elevation_m?.summit, result.temps?.kind)}
+      ${tempStat("Base", result.temps?.base, info.elevation_m?.base, result.temps?.kind)}
+      ${stat("Resort reading", `${num(result.temperature_c, " °C")}<div class="stat-note">from the resort's page</div>`)}
     </div>`;
 
   const seasonLine = seasonInfo.days_recorded ? `
     <p class="season">Season ${esc(seasonOf(day))}:
       max snow depth ${num(seasonInfo.snow_depth_max_cm, " cm")}${seasonInfo.snow_depth_max_date ? ` (${esc(formatDay(seasonInfo.snow_depth_max_date))})` : ""}
-      · temperature ${tempRange(seasonInfo)}
+      · summit ${tempRange(seasonInfo.summit_min_c, seasonInfo.summit_max_c)}
+      · base ${tempRange(seasonInfo.base_min_c, seasonInfo.base_max_c)}
       · ${seasonInfo.days_recorded} day${seasonInfo.days_recorded === 1 ? "" : "s"} recorded</p>` : "";
 
   const strip = `<div class="strip" aria-hidden="true">${
@@ -225,11 +256,10 @@ function stat(label, value) {
   return `<div class="stat"><div class="label">${esc(label)}</div><div class="value">${value}</div></div>`;
 }
 
-function tempRange(s) {
-  if (s.temperature_min_c === null || s.temperature_min_c === undefined) return NA;
-  return s.temperature_min_c === s.temperature_max_c
-    ? `${s.temperature_min_c} °C`
-    : `${s.temperature_min_c} to ${s.temperature_max_c} °C`;
+/** Season range from the final daily lows/highs; N/A until the first day is final. */
+function tempRange(min, max) {
+  if (min === null || min === undefined) return `${NA} <small>(after the first full day)</small>`;
+  return `${deg(min)} to ${deg(max)} °C`;
 }
 
 function sourceNote(sourceUpdated, day) {

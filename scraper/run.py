@@ -25,11 +25,13 @@ import importlib
 import json
 import sys
 import traceback
+from datetime import date, timedelta
 from pathlib import Path
 
 import yaml
 
 from scraper.common import RUN_STATUSES, STATUSES, fetch, now_jst
+from scraper.weather import LEVELS, PAST_DAYS, apply_temps, fetch_daily_temps, has_location
 
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT / "resorts.yaml"
@@ -177,25 +179,35 @@ def scrape_resort(resort: dict, html_override: str | None = None) -> dict:
 
 # ---------------------------------------------------------------- saving
 
-def store_result(season: dict, date: str, resort_id: str, result: dict) -> None:
+def store_result(season: dict, date: str, resort_id: str, result: dict) -> bool:
     """Put today's result in the season's days. A re-run replaces today's entry, except
-    that a failed re-run never overwrites a successful result from earlier the same day."""
+    that it never overwrites a successful result from earlier the same day with a failure
+    or with a shorter lift list (some sites, e.g. Hakuba Valley, drop lifts from their page
+    later in the day). Returns False if the earlier result was kept."""
     day = next((d for d in season["days"] if d["date"] == date), None)
     if day is None:
         day = {"date": date, "results": {}}
         season["days"].append(day)
         season["days"].sort(key=lambda d: d["date"])
     previous = day["results"].get(resort_id)
-    if previous and previous.get("ok") and not result["ok"]:
-        print(f"  keeping earlier successful result for {resort_id} today")
-        return
+    if previous and previous.get("ok"):
+        if not result["ok"]:
+            print(f"  keeping earlier successful result for {resort_id} today")
+            return False
+        if len(result["lifts"]) < len(previous["lifts"]):
+            print(f"  keeping earlier result for {resort_id} today "
+                  f"({len(previous['lifts'])} lifts; this run found only {len(result['lifts'])})")
+            result["_lifts_total"] = len(previous["lifts"])
+            return False
     day["results"][resort_id] = {k: v for k, v in result.items() if not k.startswith("_")}
+    return True
 
 
-def update_summary(summary: dict, season: dict, resort_id: str, result: dict) -> None:
-    """Recalculate one resort's season summary from all its days in that season."""
+def update_summary(summary: dict, season: dict, resort_id: str, result: dict | None) -> None:
+    """Recalculate one resort's season summary from all its days in that season.
+    `result` is today's scrape (None when only temperatures were updated)."""
     # Totals: refreshed from today's page when it worked, otherwise kept as before.
-    if result["ok"]:
+    if result and result["ok"]:
         summary["lifts_total"] = result["_lifts_total"]
         if result["_runs_total"] is not None:
             summary["runs_total"] = result["_runs_total"]
@@ -205,7 +217,6 @@ def update_summary(summary: dict, season: dict, resort_id: str, result: dict) ->
     days = [(d["date"], d["results"][resort_id]) for d in season["days"]
             if d["results"].get(resort_id, {}).get("ok")]
     depths = [(r["snow_depth_cm"], date) for date, r in days if r.get("snow_depth_cm") is not None]
-    temps = [r["temperature_c"] for _, r in days if r.get("temperature_c") is not None]
 
     if depths:
         best = max(v for v, _ in depths)
@@ -213,9 +224,45 @@ def update_summary(summary: dict, season: dict, resort_id: str, result: dict) ->
         summary["snow_depth_max_date"] = min(date for v, date in depths if v == best)
     else:
         summary["snow_depth_max_cm"] = summary["snow_depth_max_date"] = None
-    summary["temperature_min_c"] = min(temps) if temps else None
-    summary["temperature_max_c"] = max(temps) if temps else None
+
+    # Season temperature range at summit and base, from the FINAL daily lows/highs only
+    # (forecasts don't count). Uses every recorded day, even if that day's scrape failed.
+    finals = [r["temps"] for d in season["days"] if (r := d["results"].get(resort_id))
+              and (r.get("temps") or {}).get("kind") == "final"]
+    for level in LEVELS:
+        lows = [t[level]["min_c"] for t in finals if level in t]
+        highs = [t[level]["max_c"] for t in finals if level in t]
+        summary[f"{level}_min_c"] = min(lows) if lows else None
+        summary[f"{level}_max_c"] = max(highs) if highs else None
+    summary.pop("temperature_min_c", None)  # older format (morning readings), replaced by the above
+    summary.pop("temperature_max_c", None)
     summary["days_recorded"] = len(days)
+
+
+def update_weather(season: dict, resorts: list[dict], today: str) -> set[str]:
+    """Add today's forecast and yesterday's (and any missed day's) final temperatures.
+    Never fails the run: if Open-Meteo can't be reached, the next run catches up.
+    Returns the ids of resorts whose temperatures changed."""
+    try:
+        temps = fetch_daily_temps(resorts)
+    except Exception as e:
+        print(f"Weather: couldn't get temperatures from Open-Meteo ({type(e).__name__}: {e}); "
+              f"will catch up next run.")
+        return set()
+    changed = set()
+    for resort in resorts:
+        dates = apply_temps(season, resort, temps.get(resort["id"], {}), today)
+        if dates:
+            changed.add(resort["id"])
+    print(f"Weather: temperatures updated for {len(changed)} resorts.")
+    return changed
+
+
+def has_pending_forecasts(season: dict, today: str) -> bool:
+    """Any recent past day still holding a forecast instead of final temperatures?"""
+    oldest = (date.fromisoformat(today) - timedelta(days=PAST_DAYS)).isoformat()
+    return any(oldest <= d["date"] < today and (r.get("temps") or {}).get("kind") == "forecast"
+               for d in season["days"] for r in d["results"].values())
 
 
 def monthly_check_in(index: dict, now_iso: str) -> bool:
@@ -258,37 +305,59 @@ def main(argv: list[str] | None = None) -> int:
     index["season_months"] = {"start": start, "end": end}
     now = now_jst()
 
-    if not (in_season(now.month, start, end) or args.force or args.only):
-        if monthly_check_in(index, now.isoformat()):
-            save_index(index)
-            print("Off-season: no scraping. Saved this month's check-in (keeps the GitHub schedule active).")
-        else:
-            print("Off-season: no scraping, and this month's check-in is already saved.")
-        return 0
-
     today = now.date().isoformat()
     label = season_of(today)
+
+    if not (in_season(now.month, start, end) or args.force or args.only):
+        changed_files = False
+        # First off-season days: the last season days still hold a forecast; finish them.
+        season = load_season(label)
+        if has_pending_forecasts(season, today):
+            changed = update_weather(season, resorts, today)
+            summaries = index["seasons"].get(label, {}).get("summary", {})
+            for rid in changed:
+                update_summary(summaries.setdefault(rid, {}), season, rid, None)
+            if changed:
+                save_season(season)
+                changed_files = True
+        if monthly_check_in(index, now.isoformat()):
+            print("Off-season: no scraping. Saved this month's check-in (keeps the GitHub schedule active).")
+            changed_files = True
+        else:
+            print("Off-season: no scraping, and this month's check-in is already saved.")
+        if changed_files:
+            save_index(index)
+        return 0
+
     season = load_season(label)
     entry = index["seasons"].setdefault(label, {})
     entry["file"] = season_file(label)
     summaries = entry.setdefault("summary", {})
     failures = 0
+    results = {}
 
     for resort in resorts:
         print(f"{resort['id']}: scraping {resort['url']}")
-        result = scrape_resort(resort, html_override)
+        result = results[resort["id"]] = scrape_resort(resort, html_override)
         index["resorts"][resort["id"]] = {
             "name": resort["name"],
             "region": resort["region"],
             "source_url": resort["url"],
+            **({"elevation_m": {level: resort["elevation"][level] for level in LEVELS}}
+               if has_location(resort) else {}),
         }
-        store_result(season, today, resort["id"], result)
-        update_summary(summaries.setdefault(resort["id"], {}), season, resort["id"], result)
+        stored = store_result(season, today, resort["id"], result)
         if result["ok"]:
-            print(f"  ok: {result['lifts_open']}/{result['_lifts_total']} lifts open")
+            if stored:
+                print(f"  ok: {result['lifts_open']}/{result['_lifts_total']} lifts open")
         else:
             failures += 1
             print(f"  FAILED: {result['error']}")
+
+    # Temperatures (needs today's records to exist), then the season summaries.
+    update_weather(season, resorts, today)
+    for resort in resorts:
+        update_summary(summaries.setdefault(resort["id"], {}), season, resort["id"], results[resort["id"]])
 
     entry["dates"] = [d["date"] for d in season["days"]]
     # Keep resorts in the same order as resorts.yaml (the website lists them in this order).

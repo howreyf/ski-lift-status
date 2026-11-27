@@ -52,11 +52,12 @@ file for the date being viewed.
 last_updated                       when lift data was last scraped
 last_checked                       when the scraper last ran (includes off-season monthly check-ins)
 season_months                      {start, end}, copied from resorts.yaml
-resorts.<id>                       name, region, source_url
+resorts.<id>                       name, region, source_url, elevation_m {summit, base}
 seasons.<2026-27>.file             "seasons/2026-27.json"
 seasons.<2026-27>.dates            every date recorded that season
 seasons.<2026-27>.summary.<id>     lifts_total, runs_total, snow_depth_max_cm, snow_depth_max_date,
-                                   temperature_min_c, temperature_max_c, days_recorded
+                                   summit_min_c, summit_max_c, base_min_c, base_max_c (season range
+                                   from the FINAL daily lows/highs), days_recorded
 ```
 
 `docs/data/seasons/2026-27.json` (one per season, written on one line to keep it small):
@@ -64,7 +65,10 @@ seasons.<2026-27>.summary.<id>     lifts_total, runs_total, snow_depth_max_cm, s
 season                             "2026-27" (seasons run July–June, so Nov–Apr stays in one file)
 days[].date                        Japan date, e.g. 2026-11-27
 days[].results.<id>                scraped_at, ok, error (if failed), source_updated, lifts_open, runs_open,
-                                   snow_depth_cm, new_snow_cm, temperature_c, lifts[], runs[]
+                                   snow_depth_cm, new_snow_cm, temperature_c (the resort's own reading),
+                                   temps, lifts[], runs[]
+days[].results.<id>.temps          kind ("forecast" for today, "final" once the day is over),
+                                   summit {elevation_m, min_c, max_c}, base {elevation_m, min_c, max_c}
 days[].results.<id>.lifts[]        name, name_en, status (open/closed/hold/unknown), raw, hours, lift_type
 days[].results.<id>.runs[]         name, name_en, status (open/partial/closed/unknown), raw, level
 ```
@@ -85,6 +89,20 @@ Text a resort doesn't publish is stored as `"N/A"`; numbers it doesn't publish a
 - **Runs open** counts partly open runs as open.
 - Each parser's notes at the top of `scraper/parsers/<resort>.py` explain anything resort-specific
   (for example, Shiga Kogen combines its 18 ski areas, and Hakuba skips night-session rows).
+
+## Summit and base temperatures (Open-Meteo)
+
+Besides the resort's own reading, every resort gets a daily low/high at its summit and base
+height (set in `resorts.yaml`), from [Open-Meteo](https://open-meteo.com/) (free, no key,
+non-commercial use, credit shown in the website footer). Code: `scraper/weather.py`.
+
+- Each morning, today's record gets the **forecast** low/high (`temps.kind = "forecast"`).
+- The next morning that forecast is **replaced** by the day's **final** low/high
+  (`temps.kind = "final"`); the forecast isn't kept. Runs look back 7 days, so a missed morning
+  is filled in later, and on 1 May the off-season run still finalises 30 April.
+- "Final" values are the weather model's best estimate of what happened (from observations and
+  satellites), not a thermometer on the slope.
+- If Open-Meteo can't be reached, the run carries on without temperatures and catches up next time.
 
 ## What each resort publishes
 
