@@ -1,4 +1,4 @@
-// Japan Ski Lift Status — single-page site with tabs (Home, Resorts) and one page per resort.
+// Ski Status — single-page site with tabs (Home, Resorts) and one page per resort.
 //
 // Pages (the part of the address after #):
 //   #/                 Home: find-resort search, pinned resorts, resort table by region
@@ -239,12 +239,19 @@ function liftsHtml(id, result) {
   return `<strong>${result.lifts_open}</strong> / ${total}`;
 }
 
-/** The cells shared by the resort table and the search suggestions. */
-function resortCells(id) {
+const HISTORY_ICON = `<svg class="history-icon" viewBox="0 0 24 24" width="14" height="14" role="img" aria-label="Recently viewed">
+  <title>Recently viewed</title>
+  <path d="M3 12a9 9 0 1 0 3-6.7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <path d="M3 4v5h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+/** The cells shared by the resort table and the search suggestions.
+ *  `recentlyViewed` adds a small history symbol before the name (search suggestions). */
+function resortCells(id, recentlyViewed = false) {
   const info = state.index.resorts[id];
   const r = todayResult(id);
   return `
-    <span class="cell cell-name">${esc(info.name)}<span class="cell-note">${esc(info.region)}</span></span>
+    <span class="cell cell-name">${recentlyViewed ? HISTORY_ICON : ""}${esc(info.name)}<span class="cell-note">${esc(info.region)}</span></span>
     <span class="cell" data-label="Lifts open">${liftsHtml(id, r)}</span>
     <span class="cell" data-label="Runs open">${runsHtml(r)}</span>
     <span class="cell" data-label="Base temp" data-base-temp="${esc(id)}">${baseTempHtml(id)}</span>
@@ -330,13 +337,12 @@ function setupSearch(root) {
 
   function render() {
     items = suggestions(input.value);
+    const recentIds = recent.list();
     active = Math.min(active, items.length - 1);
-    const heading = normalize(input.value) ? "" :
-      `<div class="search-heading">${recent.list().length ? "Recently viewed" : "Resorts"}</div>`;
     list.innerHTML = items.length
-      ? heading + items.map((id, i) => `
+      ? items.map((id, i) => `
           <a class="search-option${i === active ? " is-active" : ""}" role="option" id="opt-${esc(id)}"
-            aria-selected="${i === active}" href="#/resort/${esc(id)}">${resortCells(id)}</a>`).join("")
+            aria-selected="${i === active}" href="#/resort/${esc(id)}">${resortCells(id, recentIds.includes(id))}</a>`).join("")
       : `<div class="search-empty">No resort matches “${esc(input.value)}”.</div>`;
     list.hidden = false;
     input.setAttribute("aria-expanded", "true");
@@ -429,11 +435,11 @@ function renderHome() {
   }
   html += `</div>
     <p class="muted small legend">Runs open by grade:
-      <span class="grade grade-green">n</span> green
-      <span class="grade grade-red">n</span> red
-      <span class="grade grade-black">n</span> black
-      <span class="grade grade-orange">n</span> expert
-      <span class="grade grade-other">n</span> level not published.
+      <span class="grade grade-green"></span> green
+      <span class="grade grade-red"></span> red
+      <span class="grade grade-black"></span> black
+      <span class="grade grade-orange"></span> expert
+      <span class="grade grade-other"></span> level not published.
       Partly open runs count as open.</p>`;
   view.innerHTML = html;
   setupSearch(view);

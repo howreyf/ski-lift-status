@@ -1,4 +1,4 @@
-# Japan Ski Lift Status
+# Ski Status
 
 Records which ski lifts are open each day at selected Japanese resorts, and shows it on a static website.
 

@@ -174,7 +174,9 @@ details[open] > summary.group-title::before { transform: rotate(45deg); }
 .grade-orange { background: var(--grade-orange); }
 .grade-other { background: var(--grade-other); }
 .legend { margin-top: 10px; line-height: 2; }
-.legend .grade { min-width: 20px; height: 20px; font-size: 11px; margin-left: 6px; }
+.legend .grade { min-width: 0; width: 14px; height: 14px; padding: 0; margin-left: 8px; vertical-align: -2px; }
+
+.history-icon { color: var(--muted); margin-right: 6px; vertical-align: -1px; flex: none; }
 
 /* ---------------------------------------------------------------- resorts directory */
 
