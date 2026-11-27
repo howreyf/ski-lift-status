@@ -439,10 +439,6 @@ def main(argv: list[str] | None = None) -> int:
                 "source_url": resort["url"],
                 **({"website": resort["website"]} if resort.get("website") else {}),
                 **({"map": resort["map"]} if resort.get("map") else {}),
-                # Officially announced opening/closing days per season, where known.
-                **({"season_dates": {str(k): {kk: str(vv) for kk, vv in v.items()}
-                                     for k, v in resort["season_dates"].items()}}
-                   if resort.get("season_dates") else {}),
                 # Position and heights: the website uses them to fetch live temperatures.
                 **({"location": {"lat": resort["location"]["lat"], "lon": resort["location"]["lon"]},
                     "elevation_m": {level: resort["elevation"][level] for level in LEVELS}}

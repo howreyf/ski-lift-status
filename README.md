@@ -51,8 +51,9 @@ details, click to pin it (click elsewhere to close), "Go to specific day" opens 
 to fill in a made-up 2025-26 season for trying the Historical tab. It's only in the browser and
 never saved; pages show a "Demo mode" banner.
 
-**Opening and closing day:** the official dates from `season_dates` in `resorts.yaml` where known,
-otherwise the first and last day any lift was running. First and last snow: days with snow at the
+**Opening and closing day:** worked out from the daily records, no extra scraping. Opening day =
+the first day any run was open; closing day = the last day any run was open, filled in once the
+season is over (after 31 May). Hakuba Valley doesn't publish runs, so its resorts use lifts instead. First and last snow: days with snow at the
 summit (Open-Meteo) or new snow reported by the resort.
 
 - Table columns: lifts open / total · runs open by grade (green, red, black, orange = expert,

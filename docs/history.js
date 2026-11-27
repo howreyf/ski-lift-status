@@ -338,18 +338,21 @@ async function recordFor(id, date) {
   return (await recordsInRange(id, date, date))[0]?.r || null;
 }
 
+/** Opening day = first day any run was open; closing day = last day any run was open, set once
+ *  the season is over (after the last season month, i.e. 31 May). Resorts that don't publish
+ *  runs (Hakuba Valley) use lifts instead. Uses the daily (09:30) records. */
 async function seasonFacts(id, label) {
-  const info = state.index.resorts[id];
-  const official = info.season_dates?.[label] || {};
   const [sStart, sEnd] = periodRange("season", label);
   const recs = await recordsInRange(id, sStart, sEnd);
-  const running = recs.filter(x => x.r.ok && x.r.lifts_open > 0).map(x => x.date);
+  const hasRuns = recs.some(x => x.r.ok && x.r.runs?.length);
+  const opened = recs.filter(x => x.r.ok && (hasRuns ? x.r.runs_open > 0 : x.r.lifts_open > 0)).map(x => x.date);
   const snowy = recs.filter(x => (x.r.temps?.kind === "final" && x.r.temps.snow_hours > 0) || x.r.new_snow_cm > 0).map(x => x.date);
   const over = todayIso() > sEnd;
   return {
-    open: official.open ? { date: official.open, official: true } : running.length ? { date: running[0], official: false } : null,
-    close: official.close ? { date: official.close, official: true }
-      : over && running.length ? { date: running[running.length - 1], official: false } : null,
+    basis: hasRuns ? "runs were open" : "lifts were running",
+    open: opened[0] || null,
+    close: over ? opened[opened.length - 1] || null : null,
+    seasonEnd: sEnd,
     firstSnow: snowy[0] || null,
     lastSnow: snowy[snowy.length - 1] || null,
     over,
@@ -449,8 +452,9 @@ function factsHtml(f) {
   const d = iso => esc(formatDay(iso));
   const item = (label, html) => `<span class="fact"><span class="fact-label">${label}</span> ${html}</span>`;
   return `<div class="facts">
-    ${item("Opening day", f.open ? `${d(f.open.date)} <span class="muted">(${f.open.official ? "official" : "first day lifts ran"})</span>` : "not yet")}
-    ${item("Closing day", f.close ? `${d(f.close.date)} <span class="muted">(${f.close.official ? "official" : "last day lifts ran"})</span>` : f.over ? NA : "not yet")}
+    ${item("Opening day", f.open ? `${d(f.open)} <span class="muted">(first day ${f.basis})</span>` : f.over ? NA : "not yet")}
+    ${item("Closing day", f.close ? `${d(f.close)} <span class="muted">(last day ${f.basis})</span>`
+      : f.over ? NA : `not yet <span class="muted">(set after ${d(f.seasonEnd)})</span>`)}
     ${item("First snow", f.firstSnow ? d(f.firstSnow) : NA)}
     ${item("Last snow", f.lastSnow ? `${d(f.lastSnow)}${f.over ? "" : ` <span class="muted">(so far)</span>`}` : NA)}
   </div>`;
@@ -501,12 +505,7 @@ async function mountLiftsExpanded(id, recs, facts) {
   if (!host || !historyUI) return;
   historyUI.graph?.destroy();
   historyUI.graph = null;
-  let [start, end] = periodRange(historyUI.unit, historyUI.value);
-  if (historyUI.unit === "season") {
-    // Widen the season graph to include an opening/closing day outside the season months (e.g. 5 May).
-    if (facts?.open?.date && facts.open.date < start) start = facts.open.date;
-    if (facts?.close?.date && facts.close.date > end) end = facts.close.date;
-  }
+  const [start, end] = periodRange(historyUI.unit, historyUI.value);
 
   if (historyUI.liftsView === "day") {
     const date = historyUI.day;
@@ -536,8 +535,8 @@ async function mountLiftsExpanded(id, recs, facts) {
   const ok = recs.filter(x => x.r.ok);
   const total = ok.length ? ok[ok.length - 1].r.lifts.length : 0;
   const markers = [];
-  if (facts?.open) markers.push({ date: facts.open.date, label: "Opening day" });
-  if (facts?.close) markers.push({ date: facts.close.date, label: "Closing day" });
+  if (facts?.open) markers.push({ date: facts.open, label: "Opening day" });
+  if (facts?.close) markers.push({ date: facts.close, label: "Closing day" });
   host.innerHTML = `<p class="muted small graph-caption">Lifts open each day, ${esc(periodLabel(historyUI.unit, historyUI.value))}.
     Hover or click the graph for a day's details.</p><div class="graph-host"></div>`;
   historyUI.graph = createGraph(host.querySelector(".graph-host"), {
@@ -734,8 +733,6 @@ function injectDemoSeason() {
       summit_lowest_mean_c: +(Math.min(...baseMeans) - 5).toFixed(1), summit_highest_mean_c: +(Math.max(...baseMeans) - 5).toFixed(1),
       new_snow_min_cm: 0, new_snow_max_cm: 30, new_snow_mean_cm: 7, days_recorded: days.length,
     };
-    const info = state.index.resorts[id];
-    info.season_dates = { ...(info.season_dates || {}), [label]: { open, close } };
   }
   state.index.seasons[label] = { file: null, demo: true, dates: days.map(d => d.date), summary };
   state.index.seasons = Object.fromEntries(Object.entries(state.index.seasons).sort());

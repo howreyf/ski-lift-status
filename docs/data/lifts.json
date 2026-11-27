@@ -22,12 +22,6 @@
    "elevation_m": {
     "summit": 1200,
     "base": 260
-   },
-   "season_dates": {
-    "2026-27": {
-     "open": "2026-11-28",
-     "close": "2027-05-05"
-    }
    }
   },
   "kiroro": {
@@ -84,11 +78,6 @@
    "elevation_m": {
     "summit": 1074,
     "base": 235
-   },
-   "season_dates": {
-    "2026-27": {
-     "open": "2026-11-28"
-    }
    }
   },
   "tomamu": {
@@ -107,11 +96,6 @@
    "elevation_m": {
     "summit": 1171,
     "base": 586
-   },
-   "season_dates": {
-    "2026-27": {
-     "open": "2026-12-01"
-    }
    }
   },
   "sapporo-kokusai": {
@@ -130,12 +114,6 @@
    "elevation_m": {
     "summit": 1100,
     "base": 630
-   },
-   "season_dates": {
-    "2026-27": {
-     "open": "2026-11-20",
-     "close": "2027-05-05"
-    }
    }
   },
   "sapporo-teine": {

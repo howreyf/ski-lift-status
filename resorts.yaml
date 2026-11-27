@@ -14,9 +14,6 @@
 #   elevation base and summit height in metres (lowest and highest lift-served points, from
 #             the resort's published figures); daily low/high temperatures are for these heights
 #   website   the resort's official website (linked under the name on its page)
-#   season_dates  (optional) officially announced opening/closing day per season, e.g.
-#             { "2026-27": { open: "2026-11-28", close: "2027-05-05" } }. Where missing, the
-#             site uses the first/last day any lift was running.
 #   map       trail map shown at the bottom of its page: type image (shown on the page),
 #             pdf or page (linked); optional note shown under it
 
@@ -36,7 +33,6 @@ resorts:
     elevation: { base: 260, summit: 1200 }   # metres
     website: https://en.grand-hirafu.jp/
     map: { type: image, url: "https://www.grand-hirafu.jp/snow/status/images/map.webp" }
-    season_dates: { "2026-27": { open: "2026-11-28", close: "2027-05-05" } }
     url: https://www.grand-hirafu.jp/snow/status/
     parser: niseko
     enabled: true
@@ -71,7 +67,6 @@ resorts:
     elevation: { base: 235, summit: 1074 }   # metres
     website: https://www.princehotels.com/en/ski/furano/
     map: { type: image, url: "https://furapuri.com/ski/map.svg", note: "Simplified map of the runs and lifts" }
-    season_dates: { "2026-27": { open: "2026-11-28" } }
     url: https://furapuri.com/ski/
     data_url: https://furapuri.com/ski/data.json
     parser: furano
@@ -84,7 +79,6 @@ resorts:
     elevation: { base: 586, summit: 1171 }   # metres
     website: https://www.snowtomamu.jp/winter/en/
     map: { type: image, url: "https://www.snowtomamu.jp/assets/ski/images/map-bg-en.png" }
-    season_dates: { "2026-27": { open: "2026-12-01" } }
     url: https://www.snowtomamu.jp/winter/en/ski/ski-slope/condition/
     parser: tomamu
     enabled: true
@@ -96,7 +90,6 @@ resorts:
     elevation: { base: 630, summit: 1100 }   # metres
     website: https://www.sapporo-kokusai.jp/en/
     map: { type: image, url: "https://www.sapporo-kokusai.jp/en/slopes/images/slopemap.png" }
-    season_dates: { "2026-27": { open: "2026-11-20", close: "2027-05-05" } }
     url: https://www.sapporo-kokusai.jp/en/slopes/
     parser: sapporo_kokusai
     enabled: true
