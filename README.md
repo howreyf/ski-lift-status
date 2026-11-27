@@ -6,7 +6,7 @@ Records which ski lifts are open each day at selected Japanese resorts, and show
 - `scraper/`: the Python scraper (`run.py` plus one small parser per resort in `scraper/parsers/`)
 - `docs/`: the website, served by GitHub Pages; the data lives in `docs/data/`
 - `tests/`: checks that each parser still reads a saved copy of its resort's page
-- `.github/workflows/scrape.yml`: runs the scraper every 30 minutes from 07:08 to 21:08 Japan time (at :08 and :38) and commits any changes
+- `.github/workflows/scrape.yml`: runs the scraper every 45 minutes from 09:08 to 21:08 Japan time and commits any changes
 - `.github/workflows/tests.yml`: runs the tests whenever code is pushed
 
 ## Setup (once)
@@ -88,7 +88,7 @@ summit (Open-Meteo) or new snow reported by the resort.
 
 ## Schedule: what is collected when
 
-GitHub runs the scraper every 30 minutes from 07:08 to 21:08 Japan time (at :08 and :38) (in season).
+GitHub runs the scraper every 45 minutes from 09:08 to 21:08 Japan time (in season).
 
 | Data | When | Kept? |
 |---|---|---|

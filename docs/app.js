@@ -17,7 +17,7 @@ const MAX_PINS = 5;
 const MAX_SUGGESTIONS = 3;
 const MAX_RECENT = 10;
 const LIVE_REFRESH_MS = 15 * 60 * 1000; // Open-Meteo updates "current" values every 15 minutes
-const STATUS_REFRESH_MS = 5 * 60 * 1000; // re-check data/live.json (the scraper updates it every 30 minutes)
+const STATUS_REFRESH_MS = 5 * 60 * 1000; // re-check data/live.json (the scraper updates it every 45 minutes)
 
 const STATUS_LABEL = { open: "Open", hold: "On hold", closed: "Closed", unknown: "Unknown" };
 const RUN_STATUS_LABEL = { open: "Open", partial: "Partly open", closed: "Closed", unknown: "Unknown" };
@@ -164,7 +164,7 @@ function liveStatusFor(id) {
   return e?.ok ? e : null;
 }
 
-/** The latest picture of a resort: lift and run status from live.json (every 30 min),
+/** The latest picture of a resort: lift and run status from live.json (every 45 min),
  *  snow and weather from the day's permanent record (once a day). */
 function currentResult(id) {
   const base = todayResult(id);
@@ -186,7 +186,7 @@ function statusTimeHtml() {
   if (!ls?.updated) return "";
   const time = new Date(ls.updated).toLocaleTimeString("en-GB", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit" });
   const day = ls.date !== new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" }) ? ` ${formatDay(ls.date)}` : "";
-  return `Lift &amp; run status: last change <strong>${esc(time)} JST${esc(day)}</strong> (checked every 30 min, 07:08–21:08)`;
+  return `Lift &amp; run status: last change <strong>${esc(time)} JST${esc(day)}</strong> (checked every 45 min, 09:08–21:08)`;
 }
 
 function seasonSummary(id) {

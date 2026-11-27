@@ -8,7 +8,7 @@ Usage (from the project folder):
     python -m scraper.run --only zao-onsen --html tests/fixtures/zao.html
                                                            # use a saved page instead of downloading
 
-GitHub runs this every 30 minutes from 07:08 to 21:08 Japan time (at :08 and :38). Every run:
+GitHub runs this every 45 minutes from 09:08 to 21:08 Japan time. Every run:
     - updates docs/data/live.json with the latest lift and run status (only if something
       changed; the file is replaced, not added to)
 and the first run at or after daily_time (09:30, set in resorts.yaml) each day also:
