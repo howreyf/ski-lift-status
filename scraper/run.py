@@ -2,19 +2,28 @@
 
 Usage (from the project folder):
     python -m scraper.run                                  # all enabled resorts (in season only)
+    python -m scraper.run --daily                          # also rewrite today's daily record now
     python -m scraper.run --force                          # scrape even outside the season
     python -m scraper.run --only zao-onsen                 # one resort (any time of year)
     python -m scraper.run --only zao-onsen --html tests/fixtures/zao.html
                                                            # use a saved page instead of downloading
 
+GitHub runs this every 30 minutes from 07:00 to 21:00 Japan time. Every run:
+    - updates docs/data/live.json with the latest lift and run status (only if something
+      changed; the file is replaced, not added to)
+and the first run at or after daily_time (09:30, set in resorts.yaml) each day also:
+    - writes the day's permanent record (lifts, runs, snow depth, new snow) to
+      docs/data/seasons/<season>.json, adds the weather (scraper/weather.py) and
+      updates the season summary in docs/data/lifts.json
+
 Files written:
     docs/data/lifts.json             small index: resorts, season summaries, which dates exist
     docs/data/seasons/2026-27.json   every day of one season (lifts and runs), no indentation
+    docs/data/live.json              the latest lift/run status (today only)
 
 Outside the season months set in resorts.yaml, nothing is scraped. Instead, once a month
-the "last_checked" time in lifts.json is updated so the daily GitHub workflow has
-something to commit; GitHub switches off scheduled workflows in repositories with no
-activity for 60 days.
+the "last_checked" time in lifts.json is updated so the GitHub workflow has something to
+commit; GitHub switches off scheduled workflows in repositories with no activity for 60 days.
 """
 
 from __future__ import annotations
@@ -37,6 +46,7 @@ ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT / "resorts.yaml"
 DATA_DIR = ROOT / "docs" / "data"
 INDEX_PATH = DATA_DIR / "lifts.json"
+LIVE_PATH = DATA_DIR / "live.json"     # latest lift/run status, replaced on every run
 
 LIFT_FIELDS = ("name", "name_en", "status", "raw", "hours", "lift_type")
 RUN_FIELDS = ("name", "name_en", "status", "raw", "level")
@@ -165,7 +175,6 @@ def scrape_resort(resort: dict, html_override: str | None = None) -> dict:
             "runs_open": sum(r["status"] in ("open", "partial") for r in runs) if runs else None,
             "snow_depth_cm": parsed.get("snow_depth_cm"),
             "new_snow_cm": parsed.get("new_snow_cm"),
-            "temperature_c": parsed.get("temperature_c"),
             "lifts": [{k: l[k] for k in LIFT_FIELDS} for l in lifts],
             "runs": [{k: r[k] for k in RUN_FIELDS} for r in runs],
             # Not stored per day; moved into the season summary by update_summary().
@@ -284,6 +293,50 @@ def monthly_check_in(index: dict, now_iso: str) -> bool:
     return True
 
 
+# ---------------------------------------------------------------- live lift/run status
+
+def live_entry(result: dict) -> dict:
+    """What live.json keeps per resort: just the lift and run status (no snow or weather)."""
+    if not result["ok"]:
+        return {"ok": False, "error": result["error"]}
+    return {"ok": True, "lifts_open": result["lifts_open"], "runs_open": result["runs_open"],
+            "lifts": result["lifts"], "runs": result["runs"]}
+
+
+def update_live(results: dict[str, dict], today: str, now_iso: str, path: Path = LIVE_PATH,
+                baseline: dict[str, dict] | None = None) -> bool:
+    """Replace live.json with this run's lift/run status. Same safeguards as the daily record:
+    a resort that failed, or returned fewer lifts than earlier today (Hakuba Valley's afternoon
+    page), keeps its earlier entry from today. `baseline` (today's permanent record) counts as
+    "earlier today" for resorts live.json doesn't have yet. The file is only rewritten when a
+    status actually changed, so quiet runs don't create a commit. Returns True if rewritten."""
+    old = _read_json(path)
+    same_day = old.get("date") == today
+    previous = old.get("results", {}) if same_day else {}
+    entries = {}
+    for rid, result in results.items():
+        new, prev = live_entry(result), previous.get(rid) or (baseline or {}).get(rid)
+        if prev and prev.get("ok") and (not new["ok"] or len(new["lifts"]) < len(prev["lifts"])):
+            new = prev
+        entries[rid] = new
+    for rid, prev in previous.items():  # resorts not scraped this run (e.g. --only) stay as they were
+        entries.setdefault(rid, prev)
+
+    def comparable(e):  # error wording may vary between runs; only ok/lifts/runs matter
+        return {rid: {k: v for k, v in x.items() if k != "error"} for rid, x in e.items()}
+
+    if same_day and comparable(entries) == comparable(previous):
+        return False
+    _write_json(path, {"date": today, "updated": now_iso, "results": entries}, compact=True)
+    return True
+
+
+def daily_due(season: dict, today: str, now_hhmm: str, daily_time: str) -> bool:
+    """The day's permanent record is written by the first run at or after daily_time
+    (09:30) that day. GitHub sometimes starts runs late, so this doesn't need an exact time."""
+    return now_hhmm >= daily_time and not any(d["date"] == today for d in season["days"])
+
+
 # ---------------------------------------------------------------- main
 
 def main(argv: list[str] | None = None) -> int:
@@ -296,10 +349,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--only", help="run just this resort id (e.g. zao-onsen), even if disabled or off-season")
     ap.add_argument("--html", help="read the page from this saved file instead of downloading (needs --only)")
     ap.add_argument("--force", action="store_true", help="scrape even outside the season months")
+    ap.add_argument("--daily", action="store_true",
+                    help="also (re)write today's permanent daily record now, whatever the time")
     args = ap.parse_args(argv)
 
     settings = load_settings()
     start, end = season_months(settings)
+    daily_time = str((settings.get("season") or {}).get("daily_time", "09:30"))
     resorts = settings["resorts"]
     if args.only:
         resorts = [r for r in resorts if r["id"] == args.only]
@@ -313,6 +369,7 @@ def main(argv: list[str] | None = None) -> int:
 
     index = load_index()
     index["season_months"] = {"start": start, "end": end}
+    index["daily_time"] = daily_time
     now = now_jst()
 
     today = now.date().isoformat()
@@ -340,51 +397,65 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     season = load_season(label)
-    entry = index["seasons"].setdefault(label, {})
-    entry["file"] = season_file(label)
-    summaries = entry.setdefault("summary", {})
-    failures = 0
-    results = {}
+    write_daily = args.daily or args.only or daily_due(season, today, now.strftime("%H:%M"), daily_time)
+    print(f"{now.strftime('%H:%M')} JST: lift/run status for all resorts"
+          f"{' + daily record (snow, weather, history)' if write_daily else ''}")
 
+    # 1. Scrape every resort (lift and run status, and the daily numbers).
+    results, failures = {}, 0
     for resort in resorts:
         print(f"{resort['id']}: scraping {resort['url']}")
         result = results[resort["id"]] = scrape_resort(resort, html_override)
-        index["resorts"][resort["id"]] = {
-            "name": resort["name"],
-            "region": resort["region"],
-            "source_url": resort["url"],
-            **({"website": resort["website"]} if resort.get("website") else {}),
-            **({"map": resort["map"]} if resort.get("map") else {}),
-            # Position and heights: the website uses them to fetch live temperatures.
-            **({"location": {"lat": resort["location"]["lat"], "lon": resort["location"]["lon"]},
-                "elevation_m": {level: resort["elevation"][level] for level in LEVELS}}
-               if has_location(resort) else {}),
-        }
-        stored = store_result(season, today, resort["id"], result)
         if result["ok"]:
-            if stored:
-                print(f"  ok: {result['lifts_open']}/{result['_lifts_total']} lifts open")
+            print(f"  ok: {result['lifts_open']}/{result['_lifts_total']} lifts open")
         else:
             failures += 1
             print(f"  FAILED: {result['error']}")
 
-    # Temperatures (needs today's records to exist), then the season summaries.
-    update_weather(season, resorts, today)
-    for resort in resorts:
-        update_summary(summaries.setdefault(resort["id"], {}), season, resort["id"], results[resort["id"]])
+    # 2. Live status: replace live.json if anything changed. Today's permanent record (if
+    #    already written) is the fallback "earlier reading" for the safeguards.
+    today_record = next((d["results"] for d in season["days"] if d["date"] == today), {})
+    baseline = {rid: live_entry(dict(r, error=r.get("error"))) for rid, r in today_record.items()
+                if r.get("ok") and "lifts" in r}
+    live_changed = update_live(results, today, now.isoformat(), baseline=baseline)
+    print("Live status: changed, live.json updated." if live_changed else "Live status: no change.")
 
-    entry["dates"] = [d["date"] for d in season["days"]]
-    # Keep resorts in the same order as resorts.yaml (the website lists them in this order).
-    order = [r["id"] for r in settings["resorts"]]
-    index["resorts"] = dict(sorted(index["resorts"].items(),
-                                   key=lambda kv: order.index(kv[0]) if kv[0] in order else len(order)))
-    index["seasons"] = dict(sorted(index["seasons"].items()))
-    index["last_updated"] = index["last_checked"] = now_jst().isoformat()
+    # 3. Once a day: the permanent record, weather and season summary.
+    if write_daily:
+        entry = index["seasons"].setdefault(label, {})
+        entry["file"] = season_file(label)
+        summaries = entry.setdefault("summary", {})
+        for resort in resorts:
+            index["resorts"][resort["id"]] = {
+                "name": resort["name"],
+                "region": resort["region"],
+                "source_url": resort["url"],
+                **({"website": resort["website"]} if resort.get("website") else {}),
+                **({"map": resort["map"]} if resort.get("map") else {}),
+                # Position and heights: the website uses them to fetch live temperatures.
+                **({"location": {"lat": resort["location"]["lat"], "lon": resort["location"]["lon"]},
+                    "elevation_m": {level: resort["elevation"][level] for level in LEVELS}}
+                   if has_location(resort) else {}),
+            }
+            store_result(season, today, resort["id"], results[resort["id"]])
 
-    save_season(season)
-    save_index(index)
-    print(f"Saved docs/data/{season_file(label)} and docs/data/lifts.json "
-          f"({len(resorts) - failures} ok, {failures} failed)")
+        # Temperatures (needs today's records to exist), then the season summaries.
+        update_weather(season, resorts, today)
+        for resort in resorts:
+            update_summary(summaries.setdefault(resort["id"], {}), season, resort["id"], results[resort["id"]])
+
+        entry["dates"] = [d["date"] for d in season["days"]]
+        # Keep resorts in the same order as resorts.yaml (the website lists them in this order).
+        order = [r["id"] for r in settings["resorts"]]
+        index["resorts"] = dict(sorted(index["resorts"].items(),
+                                       key=lambda kv: order.index(kv[0]) if kv[0] in order else len(order)))
+        index["seasons"] = dict(sorted(index["seasons"].items()))
+        index["last_updated"] = index["last_checked"] = now_jst().isoformat()
+        save_season(season)
+        save_index(index)
+        print(f"Saved docs/data/{season_file(label)} and docs/data/lifts.json")
+
+    print(f"{len(resorts) - failures} ok, {failures} failed")
     # Exit with an error only if nothing worked, so partial results still get committed.
     return 1 if resorts and failures == len(resorts) else 0
 

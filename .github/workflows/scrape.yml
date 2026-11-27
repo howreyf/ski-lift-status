@@ -1,21 +1,29 @@
-# Runs the scraper every morning and commits the new data, which updates the website.
+# Runs the scraper every 30 minutes from 07:00 to 21:00 Japan time and commits any changes,
+# which updates the website.
 #
-# In season (months set in resorts.yaml): scrapes all resorts and commits the results.
+# In season (months set in resorts.yaml):
+#   - every run: latest lift/run status -> docs/data/live.json (committed only if a status changed)
+#   - first run at or after 09:30: the day's permanent record, weather and season summary
 # Off season: scrapes nothing, but once a month commits a small check-in to
 # docs/data/lifts.json. That commit keeps the repository "active"; GitHub switches off
 # scheduled workflows in public repositories with no activity for 60 days.
 #
-# To run it by hand: GitHub -> Actions -> "Daily lift scrape" -> "Run workflow".
+# To run it by hand: GitHub -> Actions -> "Lift scrape" -> "Run workflow".
 
-name: Daily lift scrape
+name: Lift scrape
 
 on:
   schedule:
-    # 00:30 UTC = 09:30 Japan time (GitHub schedules are in UTC; Japan is UTC+9).
-    # GitHub can start scheduled runs a few minutes late at busy times.
-    - cron: "30 0 * * *"
+    # GitHub schedules are in UTC; Japan is UTC+9. GitHub can start runs late at busy times.
+    - cron: "0,30 22,23 * * *"   # 07:00-08:30 Japan time
+    - cron: "0,30 0-11 * * *"    # 09:00-20:30 Japan time
+    - cron: "0 12 * * *"         # 21:00 Japan time
   workflow_dispatch:
     inputs:
+      daily:
+        description: "Also rewrite today's daily record (snow, weather, history) now"
+        type: boolean
+        default: false
       force:
         description: "Scrape even outside the season months"
         type: boolean
@@ -52,7 +60,7 @@ jobs:
           fi
 
       - name: Scrape
-        run: python -m scraper.run ${{ inputs.force && '--force' || '' }}
+        run: python -m scraper.run ${{ inputs.daily && '--daily' || '' }} ${{ inputs.force && '--force' || '' }}
 
       - name: Commit new data
         run: |
@@ -63,5 +71,7 @@ jobs:
             echo "Nothing changed."
             exit 0
           fi
-          git commit -m "Lift data $(TZ=Asia/Tokyo date +%Y-%m-%d)"
+          git commit -m "Lift data $(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M') JST"
+          # Someone may have pushed code while this ran; put the data commit on top of it.
+          git pull --rebase
           git push

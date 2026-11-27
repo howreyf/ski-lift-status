@@ -22,6 +22,7 @@
 season:
   start_month: 11   # November
   end_month: 4      # April
+  daily_time: "09:30"   # Japan time: the first run at or after this writes the day's permanent record
 
 resorts:
   # --- Hokkaido ---

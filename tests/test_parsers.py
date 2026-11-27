@@ -273,6 +273,67 @@ class TestSaving(unittest.TestCase):
             self.assertEqual(load_season("2030-31", Path(tmp)), {"season": "2030-31", "days": []})
 
 
+class TestLive(unittest.TestCase):
+    """live.json: latest lift/run status, rewritten only when something changes."""
+
+    def result(self, statuses, ok=True):
+        lifts = [{"name": f"L{i}", "status": s} for i, s in enumerate(statuses)]
+        if not ok:
+            return {"ok": False, "error": "boom"}
+        return {"ok": True, "lifts_open": statuses.count("open"), "runs_open": None, "lifts": lifts, "runs": []}
+
+    def test_only_rewritten_when_status_changes(self):
+        import json, tempfile
+        from scraper.run import update_live
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "live.json"
+            self.assertTrue(update_live({"a": self.result(["closed", "open"])}, "2026-12-01", "2026-12-01T07:00:00+09:00", path))
+            self.assertFalse(update_live({"a": self.result(["closed", "open"])}, "2026-12-01", "2026-12-01T07:30:00+09:00", path))
+            self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["updated"], "2026-12-01T07:00:00+09:00")
+            self.assertTrue(update_live({"a": self.result(["open", "open"])}, "2026-12-01", "2026-12-01T08:00:00+09:00", path))
+            data = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual((data["updated"], data["results"]["a"]["lifts_open"]), ("2026-12-01T08:00:00+09:00", 2))
+
+    def test_failure_or_shorter_list_keeps_earlier_status_today(self):
+        import json, tempfile
+        from scraper.run import update_live
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "live.json"
+            update_live({"a": self.result(["open", "open", "closed"]), "b": self.result(["open"])}, "2026-12-01", "t1", path)
+            self.assertFalse(update_live({"a": self.result(["closed"]), "b": self.result([], ok=False)}, "2026-12-01", "t2", path))
+            data = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(len(data["results"]["a"]["lifts"]), 3)
+            self.assertTrue(data["results"]["b"]["ok"])
+
+    def test_todays_daily_record_is_the_baseline_for_a_new_live_file(self):
+        import json, tempfile
+        from scraper.run import live_entry, update_live
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "live.json"
+            baseline = {"a": live_entry(self.result(["open"] * 11))}
+            update_live({"a": self.result(["closed"] * 4)}, "2026-12-01", "t1", path, baseline=baseline)
+            self.assertEqual(len(json.loads(path.read_text(encoding="utf-8"))["results"]["a"]["lifts"]), 11)
+
+    def test_new_day_replaces_yesterday(self):
+        import json, tempfile
+        from scraper.run import update_live
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "live.json"
+            update_live({"a": self.result(["open", "open"])}, "2026-12-01", "t1", path)
+            self.assertTrue(update_live({"a": self.result(["closed"])}, "2026-12-02", "t2", path))  # new day: no carry-over
+            data = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual((data["date"], len(data["results"]["a"]["lifts"])), ("2026-12-02", 1))
+
+    def test_daily_record_written_by_first_run_after_0930(self):
+        from scraper.run import daily_due
+        season = {"days": [{"date": "2026-12-01", "results": {}}]}
+        self.assertFalse(daily_due(season, "2026-12-02", "09:00", "09:30"))  # too early
+        self.assertTrue(daily_due(season, "2026-12-02", "09:30", "09:30"))
+        self.assertTrue(daily_due(season, "2026-12-02", "10:12", "09:30"))   # 09:30 run was late
+        season["days"].append({"date": "2026-12-02", "results": {}})
+        self.assertFalse(daily_due(season, "2026-12-02", "10:30", "09:30"))  # already written today
+
+
 class TestSeasonMonths(unittest.TestCase):
     def test_in_season_across_new_year(self):
         self.assertEqual([m for m in range(1, 13) if in_season(m, 11, 4)], [1, 2, 3, 4, 11, 12])

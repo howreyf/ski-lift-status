@@ -17,6 +17,7 @@ const MAX_PINS = 5;
 const MAX_SUGGESTIONS = 3;
 const MAX_RECENT = 10;
 const LIVE_REFRESH_MS = 15 * 60 * 1000; // Open-Meteo updates "current" values every 15 minutes
+const STATUS_REFRESH_MS = 5 * 60 * 1000; // re-check data/live.json (the scraper updates it every 30 minutes)
 
 const STATUS_LABEL = { open: "Open", hold: "On hold", closed: "Closed", unknown: "Unknown" };
 const RUN_STATUS_LABEL = { open: "Open", partial: "Partly open", closed: "Closed", unknown: "Unknown" };
@@ -38,6 +39,7 @@ const state = {
   index: null,        // data/lifts.json
   latestDate: null,   // newest date with data
   latestDay: null,    // that day's record: {date, results: {id: {...}}}
+  liveStatus: null,   // data/live.json: latest lift/run status {date, updated, results}
   live: {},           // {id: {summit: {temp, time}, base: {temp, time}}}
   seasons: new Map(), // season label -> Promise of season file
 };
@@ -154,6 +156,39 @@ function todayResult(id) {
   return state.latestDay?.results?.[id];
 }
 
+/** Latest lift/run status for a resort from live.json (if it's from today or newer). */
+function liveStatusFor(id) {
+  const ls = state.liveStatus;
+  if (!ls || (state.latestDate && ls.date < state.latestDate)) return null;
+  const e = ls.results?.[id];
+  return e?.ok ? e : null;
+}
+
+/** The latest picture of a resort: lift and run status from live.json (every 30 min),
+ *  snow and weather from the day's permanent record (once a day). */
+function currentResult(id) {
+  const base = todayResult(id);
+  const live = liveStatusFor(id);
+  if (!live) return base;
+  return {
+    ...(base || {}),
+    ok: true,
+    lifts: live.lifts, runs: live.runs, lifts_open: live.lifts_open, runs_open: live.runs_open,
+    snow_depth_cm: base?.ok ? base.snow_depth_cm : null,
+    new_snow_cm: base?.ok ? base.new_snow_cm : null,
+    liveStatus: true,
+  };
+}
+
+/** "Lift & run status: last change 14:30 JST" */
+function statusTimeHtml() {
+  const ls = state.liveStatus;
+  if (!ls?.updated) return "";
+  const time = new Date(ls.updated).toLocaleTimeString("en-GB", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit" });
+  const day = ls.date !== new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" }) ? ` ${formatDay(ls.date)}` : "";
+  return `Lift &amp; run status: last change <strong>${esc(time)} JST${esc(day)}</strong> (checked every 30 min, 07:00–21:00)`;
+}
+
 function seasonSummary(id) {
   return state.index.seasons[seasonOf(state.latestDate)]?.summary?.[id] || {};
 }
@@ -248,7 +283,7 @@ const HISTORY_ICON = `<svg class="history-icon" viewBox="0 0 24 24" width="14" h
  *  `recentlyViewed` adds a small history symbol before the name (search suggestions). */
 function resortCells(id, recentlyViewed = false) {
   const info = state.index.resorts[id];
-  const r = todayResult(id);
+  const r = currentResult(id);
   return `
     <span class="cell cell-name">${recentlyViewed ? HISTORY_ICON : ""}${esc(info.name)}<span class="cell-note">${esc(info.region)}</span></span>
     <span class="cell" data-label="Lifts open">${liftsHtml(id, r)}</span>
@@ -391,8 +426,9 @@ function setupSearch(root) {
 
 function updatedLine() {
   if (!state.latestDate) return "";
-  return `<p class="muted small updated">Lift data for <strong>${esc(formatDay(state.latestDate))}</strong>
-    · last updated ${esc(formatJst(state.index.last_updated))}${seasonNoteHtml()}</p>`;
+  const status = statusTimeHtml();
+  return `<p class="muted small updated">${status ? `${status}<br>` : ""}Snow depth, new snow and weather:
+    <strong>${esc(formatDay(state.latestDate))}</strong> (updated ${esc(formatJst(state.index.last_updated))})${seasonNoteHtml()}</p>`;
 }
 
 function seasonNoteHtml() {
@@ -762,8 +798,8 @@ async function renderResortPage(id, date) {
       day = null;
     }
   }
-  const r = day?.results?.[id];
-  if (r) r.date = date;
+  const record = isLatest ? currentResult(id) : day?.results?.[id];
+  const r = record ? { ...record, date } : record;
   currentPage = { id, date, result: r, isLatest };
 
   view.innerHTML = `
@@ -779,7 +815,9 @@ async function renderResortPage(id, date) {
       <button class="pin pin-large${pins.has(id) ? " is-pinned" : ""}" type="button" data-pin="${esc(id)}"
         aria-pressed="${pins.has(id)}">${pinIcon(pins.has(id))}<span>${pins.has(id) ? "Pinned" : "Pin"}</span></button>
     </div>
-    <p class="muted small date-line">${isLatest ? "Latest data" : "Historical record"}: <strong>${esc(formatDay(date))}</strong>${
+    <p class="muted small date-line">${isLatest
+      ? `${r?.liveStatus ? `${statusTimeHtml()}<br>` : ""}Snow depth, new snow and weather: <strong>${esc(formatDay(date))}</strong>`
+      : `Historical record: <strong>${esc(formatDay(date))}</strong>`}${
       r?.source_updated ? ` · resort last updated ${esc(formatJst(r.source_updated))}` : ""}</p>
 
     ${!r ? `<p class="warn">No data for this day.</p>` : !r.ok ? `<p class="warn">Couldn't read the resort's page this day.</p>` : ""}
@@ -795,7 +833,7 @@ async function renderResortPage(id, date) {
 
 // ------------------------------------------------------------------ router
 
-function route() {
+function route(scrollTop = true) {
   const path = location.hash.replace(/^#\/?/, "");
   const [page, id, date] = path.split("/");
   const tab = page === "resorts" || page === "resort" ? "resorts" : "home";
@@ -807,7 +845,21 @@ function route() {
   if (page === "resort" && id) renderResortPage(decodeURIComponent(id), /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : null);
   else if (page === "resorts") renderDirectory();
   else renderHome();
-  window.scrollTo(0, 0);
+  if (scrollTop) window.scrollTo(0, 0);
+}
+
+/** Fetch data/live.json; if it changed, redraw the page (unless the visitor is typing a search). */
+async function loadLiveStatus(redraw = false) {
+  try {
+    const resp = await fetch("data/live.json", { cache: "no-cache" });
+    if (!resp.ok) return; // no live file yet (e.g. off-season): use the daily record
+    const data = await resp.json();
+    const changed = data.updated !== state.liveStatus?.updated;
+    state.liveStatus = data;
+    if (redraw && changed && !document.activeElement?.classList.contains("search-input")) route(false);
+  } catch (err) {
+    console.warn("Live lift status unavailable:", err.message);
+  }
 }
 
 // ------------------------------------------------------------------ start
@@ -830,8 +882,10 @@ async function start() {
       in the project folder and visit <a href="http://localhost:8000">http://localhost:8000</a> instead.</p>`;
     return;
   }
-  window.addEventListener("hashchange", route);
+  await loadLiveStatus();
+  window.addEventListener("hashchange", () => route());
   route();
+  setInterval(() => loadLiveStatus(true), STATUS_REFRESH_MS);
   fetchLive();
   setInterval(fetchLive, LIVE_REFRESH_MS);
 }

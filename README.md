@@ -6,7 +6,7 @@ Records which ski lifts are open each day at selected Japanese resorts, and show
 - `scraper/`: the Python scraper (`run.py` plus one small parser per resort in `scraper/parsers/`)
 - `docs/`: the website, served by GitHub Pages; the data lives in `docs/data/`
 - `tests/`: checks that each parser still reads a saved copy of its resort's page
-- `.github/workflows/scrape.yml`: runs the scraper every morning at 09:30 Japan time and commits the data
+- `.github/workflows/scrape.yml`: runs the scraper every 30 minutes from 07:00 to 21:00 Japan time and commits any changes
 - `.github/workflows/tests.yml`: runs the tests whenever code is pushed
 
 ## Setup (once)
@@ -20,13 +20,15 @@ python -m playwright install chromium
 
 | What | Command |
 |---|---|
-| Scrape all enabled resorts (does nothing off-season) | `python -m scraper.run` |
+| Update live lift/run status (and the daily record if it's after 09:30 and not done yet; does nothing off-season) | `python -m scraper.run` |
+| Also rewrite today's daily record now | `python -m scraper.run --daily` |
 | Scrape even off-season | `python -m scraper.run --force` |
 | Scrape one resort | `python -m scraper.run --only zao-onsen` |
 | Check the parsers still work | `python -m unittest -v` |
 | Preview the website | `python -m http.server -d docs`, then open http://localhost:8000 |
 
-Re-running on the same day replaces that day's results, so it's safe to run as often as you like.
+Re-running is safe: live.json is only rewritten when a status changed, and a re-run never replaces
+a good result with a failure or a shorter lift list.
 
 ## The website (`docs/`)
 
@@ -48,10 +50,29 @@ Plain HTML/CSS/JavaScript, no build step. Pages (the part after `#` in the addre
   highlighted suggestion, or the only one left.
 - Pins, recently viewed resorts and which regions are collapsed are saved in the visitor's own
   browser (localStorage), not on the server.
+- Lift and run status come from `docs/data/live.json` (re-checked by the browser every 5 minutes);
+  snow depth, new snow and weather come from the day's permanent record.
 - Live temperatures: the browser asks Open-Meteo for the current temperature at each resort's
   summit and base when the page opens, and every 15 minutes while it stays open.
 
-## Season months and the daily schedule
+## Schedule: what is collected when
+
+GitHub runs the scraper every 30 minutes from 07:00 to 21:00 Japan time (in season).
+
+| Data | When | Kept? |
+|---|---|---|
+| Lift and run status | every run | `live.json` is replaced each time (only when something changed); the first run at or after 09:30 also saves it as the day's permanent record |
+| Snow depth, new snow, resort's "last updated" time | first run at or after 09:30 | permanent daily record |
+| Forecast min/max/mean temperature (summit, base), next snow | first run at or after 09:30 | replaced/deleted the next morning |
+| Final min/max/mean temperature, hours of snow (+ "snowed" = 3 h or more, for the animation) | next morning, for the day before | permanent |
+| Live temperature, snowing now | visitor's browser, every 15 min while open | never stored |
+| Season summary | first run at or after 09:30 | permanent (recalculated daily) |
+
+The 09:30 time is `season.daily_time` in `resorts.yaml`. The resort's own temperature reading is not
+stored (Open-Meteo covers temperatures). Replaced files stay in the git history, but the site never
+shows old versions.
+
+## Season months
 
 `season:` in `resorts.yaml` sets the months when data is collected (November–April by default).
 Outside them the daily GitHub run scrapes nothing; instead, on the first run of each month it
@@ -91,8 +112,8 @@ seasons.<2026-27>.summary.<id>     lifts_total, runs_total, snow_depth_max_cm, s
 season                             "2026-27" (seasons run July–June, so Nov–Apr stays in one file)
 days[].date                        Japan date, e.g. 2026-11-27
 days[].results.<id>                scraped_at, ok, error (if failed), source_updated, lifts_open, runs_open,
-                                   snow_depth_cm, new_snow_cm, temperature_c (the resort's own reading),
-                                   temps, snow_outlook (today only), lifts[], runs[]
+                                   snow_depth_cm, new_snow_cm, temps, snow_outlook (today only),
+                                   lifts[], runs[]   (records before 28 Nov 2026 also have temperature_c)
 days[].results.<id>.temps          kind ("forecast" for today, "final" once the day is over),
                                    summit {elevation_m, min_c, max_c, mean_c}, base {...},
                                    snow_hours, snowed (final days only: hours of snow at the summit,
@@ -101,6 +122,13 @@ days[].results.<id>.snow_outlook   {date, days, cm}: next day with >= 1 cm of sn
                                    summit (date null if none in 16 days); deleted once the day is over
 days[].results.<id>.lifts[]        name, name_en, status (open/closed/hold/unknown), raw, hours, lift_type
 days[].results.<id>.runs[]         name, name_en, status (open/partial/closed/unknown), raw, level
+```
+
+`docs/data/live.json` (latest lift/run status, replaced on every run that finds a change):
+```
+date                               Japan date the statuses are for
+updated                            when a status last changed
+results.<id>                       ok, lifts_open, runs_open, lifts[], runs[]  (or ok: false, error)
 ```
 
 `level` is Beginner / Intermediate / Advanced / Expert / First timer (or two joined, e.g.
