@@ -343,7 +343,9 @@ def main(argv: list[str] | None = None) -> int:
             "name": resort["name"],
             "region": resort["region"],
             "source_url": resort["url"],
-            **({"elevation_m": {level: resort["elevation"][level] for level in LEVELS}}
+            # Position and heights: the website uses them to fetch live temperatures.
+            **({"location": {"lat": resort["location"]["lat"], "lon": resort["location"]["lon"]},
+                "elevation_m": {level: resort["elevation"][level] for level in LEVELS}}
                if has_location(resort) else {}),
         }
         stored = store_result(season, today, resort["id"], result)

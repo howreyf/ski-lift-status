@@ -307,6 +307,25 @@ class TestTemperatures(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_response(data[:1], points)
 
+    def test_hourly_temperatures_kept_for_final_days_only(self):
+        from scraper.weather import apply_temps, parse_response
+        hours = [f"2026-11-26T{h:02d}:00" for h in range(24)] + [f"2026-11-27T{h:02d}:00" for h in range(12)]
+        entry = lambda base: {
+            "daily": {"time": ["2026-11-26", "2026-11-27"], "temperature_2m_min": [base - 5, base - 4],
+                      "temperature_2m_max": [base + 5, base + 4]},
+            "hourly": {"time": hours, "temperature_2m": [base + i % 3 for i in range(len(hours))]},
+        }
+        out = parse_response([entry(-10), entry(-3)], [(self.RESORT, "summit"), (self.RESORT, "base")])
+        self.assertEqual(len(out["a"]["2026-11-26"]["hourly"]["summit"]), 24)
+        self.assertNotIn("hourly", out["a"]["2026-11-27"])  # only 12 hours so far: incomplete day
+
+        season = self.season("2026-11-26", "2026-11-27")
+        apply_temps(season, self.RESORT, out["a"], today="2026-11-27")
+        final, forecast = (season["days"][i]["results"]["a"]["temps"] for i in (0, 1))
+        self.assertEqual(final["kind"], "final")
+        self.assertEqual(final["hourly"]["base"][:3], [-3, -2, -1])
+        self.assertNotIn("hourly", forecast)
+
     def test_today_forecast_then_final_next_day(self):
         from scraper.weather import apply_temps
         season = self.season("2026-11-27")

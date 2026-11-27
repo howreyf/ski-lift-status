@@ -28,6 +28,28 @@ python -m playwright install chromium
 
 Re-running on the same day replaces that day's results, so it's safe to run as often as you like.
 
+## The website (`docs/`)
+
+Plain HTML/CSS/JavaScript, no build step. Pages (the part after `#` in the address):
+
+| Page | Address | What's on it |
+|---|---|---|
+| Home | `#/` | "Find resort" search, pinned resorts (up to 5), resort table grouped by region (collapsible) |
+| Resorts | `#/resorts` | Search and a directory of all resorts by region |
+| One resort | `#/resort/<id>` | Placeholder page for now: today's numbers, live summit/base temperature, lifts and runs |
+
+- Table columns: lifts open / total · runs open by grade (green, red, black, orange = expert,
+  grey = level not published; partly open counts as open; two-level runs count under the harder
+  grade) · base temperature (live, or today's forecast low/high if live isn't available) · snow depth.
+- Search suggestions (max 3): with nothing typed, recently viewed resorts first, then A–Z. While
+  typing, matches are ranked by relevance (name starts with it > a word starts with it > appears
+  inside a name > region), with recently viewed matches moved to the top. Enter opens the
+  highlighted suggestion, or the only one left.
+- Pins, recently viewed resorts and which regions are collapsed are saved in the visitor's own
+  browser (localStorage), not on the server.
+- Live temperatures: the browser asks Open-Meteo for the current temperature at each resort's
+  summit and base when the page opens, and every 15 minutes while it stays open.
+
 ## Season months and the daily schedule
 
 `season:` in `resorts.yaml` sets the months when data is collected (November–April by default).
@@ -52,7 +74,7 @@ file for the date being viewed.
 last_updated                       when lift data was last scraped
 last_checked                       when the scraper last ran (includes off-season monthly check-ins)
 season_months                      {start, end}, copied from resorts.yaml
-resorts.<id>                       name, region, source_url, elevation_m {summit, base}
+resorts.<id>                       name, region, source_url, location {lat, lon}, elevation_m {summit, base}
 seasons.<2026-27>.file             "seasons/2026-27.json"
 seasons.<2026-27>.dates            every date recorded that season
 seasons.<2026-27>.summary.<id>     lifts_total, runs_total, snow_depth_max_cm, snow_depth_max_date,
@@ -68,7 +90,8 @@ days[].results.<id>                scraped_at, ok, error (if failed), source_upd
                                    snow_depth_cm, new_snow_cm, temperature_c (the resort's own reading),
                                    temps, lifts[], runs[]
 days[].results.<id>.temps          kind ("forecast" for today, "final" once the day is over),
-                                   summit {elevation_m, min_c, max_c}, base {elevation_m, min_c, max_c}
+                                   summit {elevation_m, min_c, max_c}, base {elevation_m, min_c, max_c},
+                                   hourly {summit: [24], base: [24]} (final days only)
 days[].results.<id>.lifts[]        name, name_en, status (open/closed/hold/unknown), raw, hours, lift_type
 days[].results.<id>.runs[]         name, name_en, status (open/partial/closed/unknown), raw, level
 ```
@@ -100,6 +123,8 @@ non-commercial use, credit shown in the website footer). Code: `scraper/weather.
 - The next morning that forecast is **replaced** by the day's **final** low/high
   (`temps.kind = "final"`); the forecast isn't kept. Runs look back 7 days, so a missed morning
   is filled in later, and on 1 May the off-season run still finalises 30 April.
+- With the final values, the day's **24 hourly temperatures** at summit and base are stored too
+  (`temps.hourly.summit` / `temps.hourly.base`, 00:00–23:00 Japan time).
 - "Final" values are the weather model's best estimate of what happened (from observations and
   satellites), not a thermometer on the slope.
 - If Open-Meteo can't be reached, the run carries on without temperatures and catches up next time.

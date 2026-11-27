@@ -11,8 +11,12 @@ the lowest and highest temperature.
                       reading on the slope, but consistent across all resorts.
 
 Each morning today's record gets the forecast, and earlier days that still hold a
-forecast get it replaced by the final values. Looking back 7 days means a missed
-morning (e.g. a GitHub outage) is filled in on the next run.
+forecast get it replaced by the final values, together with that day's 24 hourly
+temperatures at summit and base. Looking back 7 days means a missed morning (e.g. a
+GitHub outage) is filled in on the next run.
+
+The website shows the live (current) temperature by asking Open-Meteo directly from
+the visitor's browser, so no hourly scraper runs are needed.
 """
 
 from __future__ import annotations
@@ -41,6 +45,7 @@ def fetch_daily_temps(resorts: list[dict]) -> dict[str, dict[str, dict]]:
         "longitude": ",".join(str(r["location"]["lon"]) for r, _ in points),
         "elevation": ",".join(str(r["elevation"][level]) for r, level in points),
         "daily": "temperature_2m_min,temperature_2m_max",
+        "hourly": "temperature_2m",
         "timezone": "Asia/Tokyo",
         "past_days": PAST_DAYS,
         "forecast_days": 1,
@@ -58,21 +63,34 @@ def parse_response(data, points: list[tuple[dict, str]]) -> dict[str, dict[str, 
         raise ValueError(f"Open-Meteo returned {len(entries)} locations, expected {len(points)}")
     out: dict[str, dict[str, dict]] = {}
     for (resort, level), entry in zip(points, entries):
+        days = out.setdefault(resort["id"], {})
         daily = entry["daily"]
         for date, lo, hi in zip(daily["time"], daily["temperature_2m_min"], daily["temperature_2m_max"]):
             if lo is None or hi is None:
                 continue
             # "+ 0.0" turns -0.0 (which Open-Meteo sometimes sends) into 0.0.
-            out.setdefault(resort["id"], {}).setdefault(date, {})[level] = {"min_c": lo + 0.0, "max_c": hi + 0.0}
+            days.setdefault(date, {})[level] = {"min_c": lo + 0.0, "max_c": hi + 0.0}
+
+        # Hourly temperatures, grouped by date: "2026-11-26T05:00" -> day "2026-11-26", hour 5.
+        hourly = entry.get("hourly") or {}
+        by_day: dict[str, list] = {}
+        for stamp, value in zip(hourly.get("time", []), hourly.get("temperature_2m", [])):
+            by_day.setdefault(stamp[:10], []).append(None if value is None else value + 0.0)
+        for date, values in by_day.items():
+            if date in days and len(values) == 24 and None not in values:  # only complete days
+                days[date].setdefault("hourly", {})[level] = values
     return out
 
 
 def temps_record(kind: str, values: dict, elevation: dict) -> dict:
-    """{"kind": "forecast"|"final", "summit": {"elevation_m", "min_c", "max_c"}, "base": {...}}"""
+    """{"kind": "forecast"|"final", "summit": {"elevation_m", "min_c", "max_c"}, "base": {...},
+        "hourly": {"summit": [24 values, 00:00-23:00 Japan time], "base": [...]}  (final only)}"""
     record = {"kind": kind}
     for level in LEVELS:
         if level in values:
             record[level] = {"elevation_m": elevation[level], **values[level]}
+    if kind == "final" and values.get("hourly"):
+        record["hourly"] = values["hourly"]
     return record
 
 

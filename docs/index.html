@@ -7,30 +7,30 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="top">
-    <div class="wrap">
-      <h1>Japan Ski Lift Status</h1>
-      <p class="sub">Which lifts were running each morning (about 09:30 JST).</p>
-      <div class="controls">
-        <label for="date">Day
-          <select id="date"></select>
-        </label>
-        <span id="updated" class="muted"></span>
-      </div>
-      <p id="season-note" class="season-note" hidden></p>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a class="brand" href="#/">Japan Ski Lift Status</a>
+      <nav class="tabs" aria-label="Main">
+        <a href="#/" data-tab="home">Home</a>
+        <a href="#/resorts" data-tab="resorts">Resorts</a>
+      </nav>
     </div>
   </header>
 
-  <main class="wrap" id="app">
+  <main class="wrap" id="view">
     <p class="muted">Loading…</p>
   </main>
 
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
   <footer class="wrap muted small">
-    Data collected once a day from each resort's own status page. Statuses can change during the day,
-    so always check the resort's site before you go. "N/A" means the resort doesn't publish that information.
-    <br>Summit and base temperatures: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Weather data by Open-Meteo.com</a>
-    (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>), model estimates for the
-    heights shown — today's values are a forecast; past days show the final daily low and high.
+    Lift and run status is collected once a day (about 09:30 JST) from each resort's own status page.
+    Statuses can change during the day, so always check the resort's site before you go.
+    "N/A" means the resort doesn't publish that information.
+    <br>Summit and base temperatures (live, forecast and daily low/high):
+    <a href="https://open-meteo.com/" target="_blank" rel="noopener">Weather data by Open-Meteo.com</a>
+    (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>),
+    weather-model values for the heights shown, not measurements on the slope.
   </footer>
 
   <script src="app.js"></script>
