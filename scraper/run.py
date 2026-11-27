@@ -153,6 +153,15 @@ def scrape_resort(resort: dict, html_override: str | None = None) -> dict:
             html = fetch_once(resort["url"], resort.get("fetch", "html"), None)
         parsed = parser.parse(html, resort.get("options") or {})
 
+        # Some resorts publish run status on a separate page (runs_url). If that page fails,
+        # the lifts are still recorded, just without runs.
+        if resort.get("runs_url") and html_override is None:
+            try:
+                runs_html = fetch_once(resort["runs_url"], resort.get("fetch", "html"), None)
+                parsed["runs"] = parser.parse_runs(runs_html, resort.get("options") or {})
+            except Exception as e:
+                print(f"  runs page failed ({type(e).__name__}: {e}); recording lifts only")
+
         lifts = parsed.get("lifts") or []
         if not lifts:
             raise ValueError("No lifts found on page (the page layout may have changed)")

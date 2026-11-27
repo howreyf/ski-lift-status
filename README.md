@@ -103,6 +103,11 @@ The 09:30 time is `season.daily_time` in `resorts.yaml`. The resort's own temper
 stored (Open-Meteo covers temperatures). Replaced files stay in the git history, but the site never
 shows old versions.
 
+**Runs open but no lifts:** when a resort lists runs as open while no lifts are running (Hakuba's
+run page is updated once in the morning, for example), the site shows a warning beside the runs.
+Hakuba Goryu and Hakuba 47 get their runs from a second page (`runs_url` in `resorts.yaml`,
+read by `parse_runs` in `scraper/parsers/hakuba_valley.py`); if it fails, lifts are still recorded.
+
 ## Season months
 
 `season:` in `resorts.yaml` sets the months when data is collected (November–May).
@@ -210,7 +215,8 @@ non-commercial use, credit shown in the website footer). Code: `scraper/weather.
 | Sapporo Kokusai | when open | N/A | N/A | yes |
 | Sapporo Teine | yes | yes | yes | yes |
 | Shiga Kogen | yes | N/A | yes (coldest area) | yes |
-| Hakuba Goryu / 47 / Happo-one | N/A | yes | N/A | N/A |
+| Hakuba Goryu / 47 | N/A | yes | N/A | yes (separate page, no difficulty) |
+| Hakuba Happo-one | N/A | yes | N/A | N/A |
 | Nozawa Onsen | in season | in season | in season | yes |
 | GALA Yuzawa | N/A | N/A | N/A | yes |
 | Zao Onsen | yes | yes | yes | yes |

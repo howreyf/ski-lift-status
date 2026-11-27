@@ -453,6 +453,15 @@ td.num { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .bucket-toggle .seg-btn { border: 1px solid var(--line); background: var(--card); }
 .bucket-toggle .seg-btn.is-active { border-color: var(--accent); }
 .pk-arrow:disabled { opacity: .35; cursor: not-allowed; }
+
+/* runs listed as open while no lifts are running */
+.alert-icon { color: var(--warn); flex: none; }
+.alert-inline { display: inline-flex; align-items: center; margin-left: 4px; vertical-align: middle; }
+.box-alert {
+  display: flex; align-items: flex-start; gap: 6px; margin-top: 8px; padding: 6px 8px;
+  border-radius: 8px; background: var(--hold-bg); color: var(--hold-fg); font-size: 12px; font-weight: 600;
+}
+.box-alert .alert-icon { color: currentColor; margin-top: 1px; }
 .graph-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); }
 .graph-tip {
   position: absolute; z-index: 5; min-width: 200px; max-width: 260px; padding: 10px 12px;

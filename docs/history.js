@@ -498,10 +498,13 @@ function snowAmount(r, source) {
 }
 
 /** Status of a lift or run over a period: "28 Nov – present", "Opened on 5 Dec", ... */
-function periodStatus(days, unit) {
+function periodStatus(days, unit, ongoing = false) {
   const open = days.filter(d => d.open);
   if (!days.length) return { cls: "unknown", text: NA };
-  if (!open.length) return { cls: "closed", text: unit === "season" ? "Closed all season" : "Closed" };
+  if (!open.length) {
+    if (unit === "season") return { cls: "closed", text: ongoing ? "Closed up till now" : "Closed all season" };
+    return { cls: "closed", text: ongoing ? "Closed (so far)" : "Closed" };
+  }
   const firstRec = days[0].date, lastRec = days[days.length - 1].date;
   const first = open[0].date, last = open[open.length - 1].date;
   const present = last === lastRec && lastRec === state.latestDate;
@@ -717,7 +720,7 @@ async function mountDayView(id, key, host, ui, opts) {
   const [sStart, sEnd] = periodRange("season", seasonOf(date));
   const table = !r ? `<p class="muted">No record for this day.</p>`
     : !r.ok ? `<p class="muted">Couldn't read the resort's page this day.</p>`
-    : key === "lifts" ? liftsTable(r.lifts, true) : runsTable(r.runs || [], true);
+    : key === "lifts" ? liftsTable(r.lifts, true) : runsTable(r.runs || [], true, r.lifts_open);
   host.innerHTML = `
     <div class="dayview-head">
       <div class="dayview-nav">
@@ -815,7 +818,7 @@ function mountExpanded(id, recs, facts) {
 
 // ------------------------------------------------------------------ lists below the boxes
 
-function periodListsHtml(recs, unit) {
+function periodListsHtml(recs, unit, ongoing = false) {
   const ok = recs.filter(x => x.r.ok);
   if (!ok.length) return "";
   const word = unitWord(unit);
@@ -834,7 +837,7 @@ function periodListsHtml(recs, unit) {
         <tbody>${lifts.map(({ item: l, days }) => `
           <tr>
             <td>${esc(l.name_en)}${l.name !== l.name_en ? `<span class="cell-note" lang="ja">${esc(l.name)}</span>` : ""}</td>
-            <td>${badge(periodStatus(days, unit))}</td>
+            <td>${badge(periodStatus(days, unit, ongoing))}</td>
             <td class="num">${esc(l.hours)}</td>
             <td>${typeIcon(l.lift_type)}</td>
           </tr>`).join("")}</tbody>
@@ -850,7 +853,7 @@ function periodListsHtml(recs, unit) {
         <tbody>${runs.map(({ item: x, days }) => `
           <tr>
             <td>${esc(x.name_en)}${x.name !== x.name_en ? `<span class="cell-note" lang="ja">${esc(x.name)}</span>` : ""}</td>
-            <td>${badge(periodStatus(days, unit))}</td>
+            <td>${badge(periodStatus(days, unit, ongoing))}</td>
             <td>${difficultyHtml(x.level)}</td>
           </tr>`).join("")}</tbody>
       </table>
@@ -912,11 +915,11 @@ async function renderHistoryPage(id, unit, value, carry = null) {
     content = `
       ${!r ? `<p class="warn">No record for this day.</p>` : !r.ok ? `<p class="warn">Couldn't read the resort's page this day.</p>` : ""}
       <div class="boxes">${dayBoxes(id, r, value, historyUI)}</div>
-      ${r?.ok ? liftsTable(r.lifts) + runsTable(r.runs || []) : ""}`;
+      ${r?.ok ? liftsTable(r.lifts) + runsTable(r.runs || [], false, r.lifts_open) : ""}`;
   } else {
     content = `
       <div class="boxes">${periodBoxes(id, recs, historyUI)}</div>
-      ${recs.length ? periodListsHtml(recs, unit) : `<p class="muted">No data recorded in this period.</p>`}`;
+      ${recs.length ? periodListsHtml(recs, unit, todayIso() <= end) : `<p class="muted">No data recorded in this period.</p>`}`;
   }
 
   view.innerHTML = `

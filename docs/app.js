@@ -258,12 +258,28 @@ function runsByGrade(runs) {
   return GRADES.map(g => counts.get(g.key)).filter(Boolean);
 }
 
+/** True when the resort lists runs as open although no lifts are running
+ *  (e.g. Hakuba's run page is updated once in the morning; lifts may have closed since). */
+function runsWithoutLifts(r) {
+  return !!(r?.ok && r.lifts_open === 0 && r.runs_open > 0);
+}
+
+const ALERT_ICON = `<svg class="alert-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 3l10 18H2z" fill="currentColor"/><path d="M12 10v5" stroke="var(--card)" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="18" r="1.2" fill="var(--card)"/></svg>`;
+
+function runsAlertHtml(r, long = false) {
+  if (!runsWithoutLifts(r)) return "";
+  const text = `No lifts are open, but ${r.runs_open} run${r.runs_open === 1 ? " is" : "s are"} listed as open`;
+  return long
+    ? `<div class="box-alert" role="note">${ALERT_ICON}<span>${esc(text)}. The runs may not be reachable.</span></div>`
+    : `<span class="alert-inline" title="${esc(text)}" role="img" aria-label="${esc(text)}">${ALERT_ICON}</span>`;
+}
+
 function runsHtml(result) {
   const runs = result?.runs || [];
   if (!result?.ok || !runs.length) return NA;
   return `<span class="grades">${runsByGrade(runs).map(c =>
     `<span class="grade grade-${c.grade.key}" title="${esc(c.grade.label)}: ${c.open} of ${c.total} runs open">${c.open}</span>`
-  ).join("")}</span>`;
+  ).join("")}${runsAlertHtml(result)}</span>`;
 }
 
 function liftsHtml(id, result) {
@@ -569,7 +585,7 @@ function runsBox(id, r) {
   const p = pct(r.runs_open, runs.length);
   return box("runs", "Runs open",
     `<div class="box-value">${r.runs_open} <small>/ ${runs.length}</small></div>
-     <div class="box-grades">${runsHtml(r)}</div>`, p, "fill-green");
+     <div class="box-grades">${runsHtml(r)}</div>${runsAlertHtml(r, true)}`, p, "fill-green");
 }
 
 function snowDepthBox(id, r, date, isLatest) {
@@ -742,12 +758,13 @@ function liftsTable(lifts, startOpen = false) {
     </details>`;
 }
 
-function runsTable(runs, startOpen = false) {
+function runsTable(runs, startOpen = false, liftsOpen = null) {
   if (!runs.length) return `<p class="muted small">Runs: ${NA} (the resort doesn't publish run status).</p>`;
   const open = runs.filter(x => x.status === "open" || x.status === "partial").length;
   return `
     <details class="detail-table"${startOpen ? " open" : ""}>
-      <summary><span class="summary-title">Runs <span class="muted">· ${open} of ${runs.length} open</span></span>
+      <summary><span class="summary-title">Runs <span class="muted">· ${open} of ${runs.length} open</span>
+        ${runsAlertHtml({ ok: true, lifts_open: liftsOpen, runs_open: open })}</span>
         ${runGradeTotalsHtml(runs)}</summary>
       <table>
         <thead><tr><th>Run</th><th>Status</th><th>Difficulty</th></tr></thead>
@@ -831,7 +848,7 @@ async function renderResortPage(id, date) {
     ${!r ? `<p class="warn">No data for this day.</p>` : !r.ok ? `<p class="warn">Couldn't read the resort's page this day.</p>` : ""}
     <div class="boxes">${boxesHtml(id, r, date, isLatest)}</div>
 
-    ${r?.ok ? liftsTable(r.lifts) + runsTable(r.runs || []) : ""}
+    ${r?.ok ? liftsTable(r.lifts) + runsTable(r.runs || [], false, r.lifts_open) : ""}
     ${mapHtml(info)}`;
 
   view.querySelector("button[data-pin]").addEventListener("click", () => {

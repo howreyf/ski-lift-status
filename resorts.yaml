@@ -5,6 +5,7 @@
 #   region    used to group resorts on the website
 #   url       the lift status page
 #   parser    file in scraper/parsers/ that reads the page (without .py)
+#   runs_url  (optional) a separate page with run status (the parser's parse_runs reads it)
 #   data_url  (optional) where the data is actually downloaded from, when the page loads it
 #             from a separate feed; `url` is still the page linked from the website
 #   fetch     "html" (plain download, default) or "browser" (Playwright, for JavaScript-built pages)
@@ -126,7 +127,8 @@ resorts:
     map: { type: pdf, url: "https://www.hakubavalley.com/cms/wp-content/uploads/2025/11/25-26_日英並記.pdf" }
     url: http://hakubavalley.com/en/weather_en/
     parser: hakuba_valley
-    options: { area: goryu }
+    runs_url: https://www.hakubagoryu.jp/en/ski-en/gelande/slope-conditions/
+    options: { area: goryu, runs_sections: [toomi, iimori] }
     enabled: true
 
   - id: hakuba-47
@@ -138,7 +140,8 @@ resorts:
     map: { type: pdf, url: "https://www.hakubavalley.com/cms/wp-content/uploads/2026/01/25-26_47.pdf" }
     url: http://hakubavalley.com/en/weather_en/
     parser: hakuba_valley
-    options: { area: "47" }
+    runs_url: https://www.hakubagoryu.jp/en/ski-en/gelande/slope-conditions/
+    options: { area: "47", runs_sections: [hakuba47] }
     enabled: true
 
   - id: hakuba-happo-one

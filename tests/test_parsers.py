@@ -139,6 +139,18 @@ class TestSpecificLifts(unittest.TestCase):
     def test_hakuba_skips_night_sessions(self):
         self.assertFalse(any("Night" in n for n in self.lifts["hakuba-goryu"]))
 
+    def test_hakuba_runs_from_the_slope_conditions_page(self):
+        from scraper.parsers.hakuba_valley import parse_runs
+        html = (FIXTURES / "hakuba_slopes.html").read_text(encoding="utf-8")  # saved 2026-11-27
+        goryu = parse_runs(html, {"runs_sections": ["toomi", "iimori"]})
+        h47 = parse_runs(html, {"runs_sections": ["hakuba47"]})
+        self.assertEqual((len(goryu), sum(r["status"] == "open" for r in goryu)), (24, 7))
+        self.assertEqual((len(h47), sum(r["status"] == "open" for r in h47)), (23, 20))
+        self.assertFalse(any("Night" in r["name"] or "Sunrise" in r["name"] for r in goryu))  # sessions skipped
+        self.assertIn("Toomi Slope(Upper)", [r["name"] for r in goryu])                     # a real run, kept
+        with self.assertRaises(ValueError):
+            parse_runs(html, {"runs_sections": ["no-such-section"]})
+
     def test_gala_japanese_and_english_names(self):
         l = self.lifts["gala-yuzawa"]["Diligence"]
         self.assertEqual((l["name"], l["lift_type"]), ("ディリジャンス", "Gondola"))

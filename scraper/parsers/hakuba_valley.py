@@ -14,7 +14,7 @@ import re
 
 from bs4 import BeautifulSoup
 
-from scraper.common import clean_text, lift, to_jst_iso, to_number
+from scraper.common import clean_text, lift, run, to_jst_iso, to_number
 
 SESSION_ROW = re.compile(r"\((night|sunrise)[^)]*\)\s*$", re.IGNORECASE)
 
@@ -60,5 +60,27 @@ def parse(html: str, options: dict) -> dict:
         "new_snow_cm": None,
         "temperature_c": None,
         "lifts": lifts,
-        "runs": [],  # not on this page
+        "runs": [],  # not on this page; see parse_runs (Goryu and Hakuba 47 only)
     }
+
+
+def parse_runs(html: str, options: dict) -> list[dict]:
+    """Run status from https://www.hakubagoryu.jp/en/ski-en/gelande/slope-conditions/, which
+    covers Goryu (sections "toomi" = Alps Daira / Toomi, and "iimori") and Hakuba 47
+    ("hakuba47"). options.runs_sections picks the sections for this resort.
+    Night-ski and sunrise-ski rows are sessions of the same run, so they're skipped."""
+    soup = BeautifulSoup(html, "html.parser")
+    runs = []
+    for section_id in options.get("runs_sections") or []:
+        section = soup.find(id=section_id)
+        if section is None:
+            raise ValueError(f"No run table {section_id!r} on the slope conditions page")
+        for tr in section.select("table tr"):
+            tds = tr.find_all("td")
+            if len(tds) < 2:
+                continue
+            name = clean_text(tds[0].get_text())
+            if SESSION_ROW.search(name):
+                continue
+            runs.append(run(name, tds[1].get_text()))
+    return runs
