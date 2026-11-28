@@ -50,7 +50,8 @@ Plain HTML/CSS/JavaScript, no build step. Pages (the part after `#` in the addre
 | Compare | `#/compare` | One list of up to 10 resorts, each with a season (e.g. 26-27), shared by both modes, and one time range at the top for all of them: Season (each resort's whole season) or Month, from one month to another (e.g. December–January of each resort's own season). Graph mode: a line each, seasons lined up by date; choose the data point and "As a percentage". Side-by-side mode: a column each, sections open together |
 
 **Connected resorts (areas):** `areas:` in `resorts.yaml` (Niseko United = Grand Hirafu,
-Annupuri, Village and Hanazono; Hakuba Valley = Hakuba Goryu, Hakuba 47 and Happo-one) shows the resorts as ONE row on Resorts and Historical, with
+Annupuri, Village and Hanazono; Hakuba Valley = Hakuba Goryu, Hakuba 47 and Happo-one) shows the resorts as ONE row on Resorts and Historical (an arrow beside the name opens a row for each of its resorts;
+closed by default), with
 one present page (`#/resort/niseko-united`) and one history page (`#/history/niseko-united/...`).
 Lifts and runs are totals (each named with its resort), snow depth, new snow, temperatures and
 season summary values are averages of the resorts (`docs/areas.js`, combined in the browser from
