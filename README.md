@@ -36,7 +36,7 @@ Plain HTML/CSS/JavaScript, no build step. Pages (the part after `#` in the addre
 
 | Page | Address | What's on it |
 |---|---|---|
-| Home | `#/` | Large "Ski Status" title and a "Find resorts" button, over a 3D contour drawing of a mountain range that runs behind the whole page (`docs/contours-light.svg` / `contours-dark.svg`: stacked contour layers seen from the front, higher layers hiding the ones behind), and the pinned resorts (up to 5) or, with none pinned, a prompt that leads to Resorts |
+| Home | `#/` | Large "Ski Status" title and a "Find resorts" button, over a 3D contour drawing of a mountain range that runs behind the whole page (`docs/contours-light.svg` / `contours-dark.svg`: stacked contour layers seen diagonally from above and from a corner, higher layers hiding the ones behind). No small print on Home, and the pinned resorts (up to 5) or, with none pinned, a prompt that leads to Resorts |
 | Resorts | `#/resorts` | "Find resort" search with a Sort button, pinned resorts, resort table grouped by region (collapsible) |
 | (Sort) | Resorts and Historical | Sort by number of runs or lifts, lifts or runs open, runs (or runs open) of one difficulty, snow depth, base temperature or night skiing; high to low or low to high; "Keep resorts in their regions" sorts inside each region dropdown, otherwise one list. N/A always last. Shared by both tabs, kept in the browser (`docs/sort.js`). On Historical the values are for the chosen period (peaks and means) |
 | One resort | `#/resort/<id>` | Boxes (lifts, runs, snow depth, new snow, base and summit temperature), lifts and runs lists, trail map |

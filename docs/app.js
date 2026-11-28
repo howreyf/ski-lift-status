@@ -517,9 +517,8 @@ function setupSearch(root, opts = PRESENT_SEARCH) {
 
 function updatedLine() {
   if (!state.latestDate) return "";
-  const status = statusTimeHtml();
-  return `<p class="muted small updated">${status ? `${status}<br>` : ""}Snow depth, new snow and weather:
-    <strong>${esc(formatDay(state.latestDate))}</strong> (updated ${esc(formatJst(state.index.last_updated))})${seasonNoteHtml()}</p>`;
+  const status = statusTimeHtml(), note = seasonNoteHtml();
+  return status || note ? `<p class="muted small updated">${status}${note}</p>` : "";
 }
 
 function seasonNoteHtml() {
@@ -912,10 +911,10 @@ async function renderResortPage(id, date) {
           aria-pressed="${pins.has(id)}">${pinIcon(pins.has(id))}<span>${pins.has(id) ? "Pinned" : "Pin"}</span></button>
       </div>
     </div>
-    <p class="muted small date-line">${isLatest
-      ? `${r?.liveStatus ? `${statusTimeHtml()}<br>` : ""}Snow depth, new snow and weather: <strong>${esc(formatDay(date))}</strong>`
-      : `Historical record: <strong>${esc(formatDay(date))}</strong>`}${
-      r?.source_updated ? ` · resort last updated ${esc(formatJst(r.source_updated))}` : ""}</p>
+    <p class="muted small date-line">${[
+      isLatest ? (r?.liveStatus ? statusTimeHtml() : "") : `Historical record: <strong>${esc(formatDay(date))}</strong>`,
+      r?.source_updated ? `resort last updated ${esc(formatJst(r.source_updated))}` : "",
+    ].filter(Boolean).join(" · ")}</p>
 
     ${isLatest ? staleHtml(id, true) : ""}
     ${!r ? `<p class="warn">No data for this day.</p>` : !r.ok && !(isLatest && failingSince(id)) ? `<p class="warn">Couldn't read the resort's page this day.</p>` : ""}

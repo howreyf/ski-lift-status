@@ -245,6 +245,7 @@ body.is-home {
 @media (prefers-color-scheme: dark) {
   body.is-home { background-image: url(contours-dark.svg); }
 }
+body.is-home > footer { display: none; } /* no small print on Home */
 .hero { margin: 0 0 12px; padding: 9vh 20px max(24vh, 170px); text-align: center; }
 .hero-title { text-shadow: 0 0 24px var(--bg), 0 0 8px var(--bg); }
 .hero-title { margin: 0 0 30px; font-size: clamp(48px, 10vw, 92px); font-weight: 800; line-height: 1; letter-spacing: -.035em; }
