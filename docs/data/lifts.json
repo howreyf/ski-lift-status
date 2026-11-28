@@ -1,6 +1,6 @@
 {
- "last_updated": "2026-11-28T07:02:05+00:00",
- "last_checked": "2026-11-28T07:02:05+00:00",
+ "last_updated": "2026-11-28T08:03:54+00:00",
+ "last_checked": "2026-11-28T08:03:54+00:00",
  "resorts": {
   "niseko-hirafu": {
    "name": "Niseko Grand Hirafu",
@@ -990,5 +990,26 @@
    "21:00"
   ],
   "daily_time": "09:30"
+ },
+ "areas": {
+  "niseko-united": {
+   "name": "Niseko United",
+   "region": "Hokkaido",
+   "country": "Japan",
+   "timezone": "Asia/Tokyo",
+   "resorts": [
+    "niseko-hirafu",
+    "niseko-annupuri",
+    "niseko-village",
+    "niseko-hanazono"
+   ],
+   "website": "https://www.niseko.ne.jp/en/",
+   "source_url": "https://www.niseko.ne.jp/en/niseko-lift-status/",
+   "map": {
+    "type": "page",
+    "url": "https://www.niseko.ne.jp/en/map/",
+    "note": "Niseko United trail maps"
+   }
+  }
  }
 }
