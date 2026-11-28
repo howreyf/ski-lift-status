@@ -211,6 +211,11 @@ details[open] > summary.group-title::before { transform: rotate(45deg); }
 
 .breadcrumb { font-size: 14px; color: var(--muted); margin-bottom: 8px; }
 .breadcrumb a { text-decoration: none; }
+.back-link {
+  display: inline-block; margin: 0 0 6px -8px; padding: 4px 10px 4px 8px; border-radius: 8px;
+  font-size: 14px; font-weight: 600; text-decoration: none;
+}
+.back-link:hover { background: var(--accent-soft); }
 .resort-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
 .resort-head p { margin: 0 0 12px; }
 .placeholder {

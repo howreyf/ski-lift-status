@@ -897,7 +897,7 @@ async function renderResortPage(id, date) {
   currentPage = { id, date, result: r, isLatest };
 
   view.innerHTML = `
-    <nav class="breadcrumb" aria-label="Breadcrumb"><a href="#/resorts">Resorts</a> › <span>${esc(info.name)}</span></nav>
+    ${backLinkHtml({ hash: "#/resorts", label: "Resorts" })}
     <div class="resort-head">
       <div>
         <h1 class="page-title">${esc(info.name)}${nightIcon(nightSkiing(id, date))}</h1>
@@ -953,7 +953,37 @@ function linkBoxesToLists() {
 
 // ------------------------------------------------------------------ router
 
+// ------------------------------------------------------------------ back link on resort pages
+
+/** The list page a resort page was opened from (Home, Resorts, Historical or Compare). It's
+ *  kept while moving around that resort's present and historical pages, and for the browser
+ *  tab's session (so a reload keeps it). */
+const LIST_PAGES = { "": "Home", resorts: "Resorts", history: "Historical", compare: "Compare" };
+let lastHash = null;
+
+function listPageOf(hash) {
+  const parts = (hash || "").replace(/^#\/?/, "").split("/").filter(Boolean);
+  if (parts.length > 1 || !((parts[0] || "") in LIST_PAGES)) return null; // a resort page, or unknown
+  const page = parts[0] || "";
+  return { hash: `#/${page}`, label: LIST_PAGES[page] };
+}
+function noteNavigation() {
+  const from = lastHash === null ? null : listPageOf(lastHash); // null: the page was just opened
+  if (from && !listPageOf(location.hash)) {
+    try { sessionStorage.setItem("backTo", JSON.stringify(from)); } catch { /* ignore */ }
+  }
+  lastHash = location.hash;
+}
+/** "‹ Back to Home" — or `fallback` when the page was opened directly (a link or bookmark). */
+function backLinkHtml(fallback) {
+  let to = null;
+  try { to = JSON.parse(sessionStorage.getItem("backTo")); } catch { /* ignore */ }
+  if (!to?.hash || !to?.label) to = fallback;
+  return `<a class="back-link" href="${esc(to.hash)}">‹ Back to ${esc(to.label)}</a>`;
+}
+
 function route(scrollTop = true) {
+  noteNavigation();
   const path = location.hash.replace(/^#\/?/, "");
   const [page, id, date, value] = path.split("/");
   const tab = page === "resorts" || page === "resort" ? "resorts" : page === "history" ? "history" : page === "compare" ? "compare" : "home";
