@@ -536,11 +536,43 @@ function closedRegions() {
   return readList("closedRegions");
 }
 
+/** Home: the big "Ski Status" title over contour lines, a way to the resorts, and the
+ *  visitor's pinned resorts (or a prompt to pin some). */
 function renderHome() {
+  const pinned = pins.list();
+  view.innerHTML = `
+    <section class="hero">
+      <h1 class="hero-title">Ski Status</h1>
+      <p class="hero-sub">Lifts, runs and snow at ${resortIds().length} ski resorts in Japan</p>
+      <a class="button hero-button" href="#/resorts">Find resorts</a>
+    </section>
+    <section class="home-pinned" aria-labelledby="pinned-title">
+      <h2 class="home-section-title" id="pinned-title">${pinIcon(true)} Pinned resorts
+        ${pinned.length ? `<span class="count">${pinned.length} / ${MAX_PINS}</span>` : ""}</h2>
+      ${pinned.length ? `
+        ${updatedLine()}
+        <div class="resort-table">
+          ${TABLE_HEAD}
+          <div class="group group-pinned">${pinned.map(resortRow).join("")}</div>
+        </div>` : `
+        <a class="pin-prompt" href="#/resorts">
+          <span class="pin-prompt-icon">${pinIcon(false)}</span>
+          <span><strong>Pin a resort to see it here</strong>
+            <span class="pin-prompt-note">Tap the pin beside any resort on the Resorts page. You can pin up to ${MAX_PINS}.</span></span>
+          <span class="pin-prompt-go" aria-hidden="true">›</span>
+        </a>`}
+    </section>`;
+  view.querySelectorAll("button[data-pin]").forEach(btn => btn.addEventListener("click", () => {
+    if (pins.toggle(btn.dataset.pin)) renderHome();
+  }));
+}
+
+/** Resorts tab: every resort's status today, with search, pins and regions. */
+function renderResorts() {
   const pinned = pins.list();
   const closed = closedRegions();
   let html = `
-    <h1 class="page-title">Today at the resorts</h1>
+    <h1 class="page-title">Resorts</h1>
     ${updatedLine()}
     ${searchHtml()}
     <div class="resort-table">
@@ -571,29 +603,12 @@ function renderHome() {
   setupSearch(view);
 
   view.querySelectorAll("button[data-pin]").forEach(btn => btn.addEventListener("click", () => {
-    if (pins.toggle(btn.dataset.pin)) renderHome();
+    if (pins.toggle(btn.dataset.pin)) renderResorts();
   }));
   view.querySelectorAll("details.region").forEach(d => d.addEventListener("toggle", () => {
     const list = closedRegions().filter(r => r !== d.dataset.region);
     writeList("closedRegions", d.open ? list : [...list, d.dataset.region]);
   }));
-}
-
-function renderDirectory() {
-  let html = `
-    <h1 class="page-title">Resorts</h1>
-    <p class="muted small">Pick a resort to see its page.</p>
-    ${searchHtml()}
-    <div class="directory">`;
-  for (const [region, ids] of regions()) {
-    html += `
-      <section class="directory-region">
-        <h2>${esc(region)}</h2>
-        <ul>${ids.map(id => `<li><a href="#/resort/${esc(id)}">${esc(state.index.resorts[id].name)}</a>${nightIcon(nightSkiing(id, state.latestDate))}${staleHtml(id)}</li>`).join("")}</ul>
-      </section>`;
-  }
-  view.innerHTML = html + "</div>";
-  setupSearch(view);
 }
 
 // ------------------------------------------------------------------ resort page
@@ -967,7 +982,7 @@ function route(scrollTop = true) {
   if (page === "history") id ? renderHistoryPage(decodeURIComponent(id), date, value) : renderHistoryDirectory();
   else if (page === "compare") { compareSeen(); renderCompare(); }
   else if (page === "resort" && id) renderResortPage(decodeURIComponent(id), /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : null);
-  else if (page === "resorts") renderDirectory();
+  else if (page === "resorts") renderResorts();
   else renderHome();
   if (scrollTop) window.scrollTo(0, 0);
 }

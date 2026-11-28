@@ -36,8 +36,8 @@ Plain HTML/CSS/JavaScript, no build step. Pages (the part after `#` in the addre
 
 | Page | Address | What's on it |
 |---|---|---|
-| Home | `#/` | "Find resort" search, pinned resorts (up to 5), resort table grouped by region (collapsible) |
-| Resorts | `#/resorts` | Search and a directory of all resorts by region |
+| Home | `#/` | Large "Ski Status" title over contour lines (`docs/contours.svg`, used as a mask so it takes the theme colour), a "Find resorts" button, and the pinned resorts (up to 5) or, with none pinned, a prompt that leads to Resorts |
+| Resorts | `#/resorts` | "Find resort" search, pinned resorts, resort table grouped by region (collapsible) |
 | One resort | `#/resort/<id>` | Boxes (lifts, runs, snow depth, new snow, base and summit temperature), lifts and runs lists, trail map |
 | One resort, past day | `#/resort/<id>/<YYYY-MM-DD>` | The same for a historical record (final temperatures, day's mean vs season) |
 | Historical | `#/history` | Season/Month picker at the top (remembers the last season or month chosen anywhere in Historical; first visit: latest season), search, and a table like Home with pins and region dropdowns: most lifts open, most runs open (by grade), mean base temperature, mean snow depth over that period. A resort opens its history at the same period |
