@@ -498,9 +498,9 @@ function historyCells(id, recentlyViewed = false) {
   const start = historyDir.unit ? periodRange(historyDir.unit, historyDir.value)[0] : state.latestDate;
   return `
     <span class="cell cell-name">${recentlyViewed ? HISTORY_ICON : ""}${esc(info.name)}${nightIcon(nightSkiing(id, start))}<span class="cell-note">${esc(info.region)}</span></span>
-    <span class="cell" data-label="Most lifts open">${s.lifts
+    <span class="cell" data-label="Peak lifts open">${s.lifts
       ? `<strong>${s.lifts.r.lifts_open}</strong> / ${s.lifts.r.lifts.length}${on(s.lifts, s.lifts.r.lifts_open)}` : NA}</span>
-    <span class="cell" data-label="Most runs open">${s.runs
+    <span class="cell" data-label="Peak runs open">${s.runs
       ? `${runsHtml({ ok: true, runs: s.runs.r.runs })}${on(s.runs, s.runs.r.runs_open)}` : NA}</span>
     <span class="cell" data-label="Mean base temp">${s.base != null ? `${deg(s.base)} °C` : NA}</span>
     <span class="cell" data-label="Mean snow depth">${s.depth != null ? `${Math.round(s.depth)} cm` : NA}</span>`;
@@ -510,7 +510,7 @@ const HISTORY_SEARCH = { cells: historyCells, href: historyHref };
 
 const HISTORY_TABLE_HEAD = `
   <div class="table-head" aria-hidden="true">
-    <span>Resort</span><span>Most lifts open</span><span>Most runs open</span><span>Mean base temp</span><span>Mean snow depth</span><span></span>
+    <span>Resort</span><span>Peak lifts open</span><span>Peak runs open</span><span>Mean base temp</span><span>Mean snow depth</span><span></span>
   </div>`;
 
 function historyRow(id) {
@@ -558,9 +558,9 @@ function highlightBox(label, lead, valueHtml, note, emptyValue, emptyNote) {
 function highlightBoxes(unit, value) {
   const st = id => historyDir.stats[id] || {};
   const day = iso => esc(shortDay(iso));
-  const onDay = (lead, x) => lead && lead.ids.length === 1 ? `on ${day(x(lead.ids[0]).date)}` : "";
+  const onDay = (lead, x) => lead && lead.ids.length === 1 ? `peak on ${day(x(lead.ids[0]).date)}` : "";
   const mostRuns = leaders(id => st(id).runs?.r.runs_open || null, (a, b) => a > b);
-  const mostRunsBox = highlightBox("Most runs open", mostRuns,
+  const mostRunsBox = highlightBox("Peak runs open", mostRuns,
     mostRuns && `${mostRuns.value} <small>runs</small>`, onDay(mostRuns, id => st(id).runs),
     NA, "No runs open yet");
 
@@ -590,7 +590,7 @@ function highlightBoxes(unit, value) {
   return [
     highlightBox("Most new snow", mostSnow, mostSnow && `${mostSnow.value} <small>cm</small>`,
       "total this month", "0 cm", "No new snow recorded"),
-    highlightBox("Most lifts open", mostLifts, mostLifts && `${mostLifts.value} <small>lifts</small>`,
+    highlightBox("Peak lifts open", mostLifts, mostLifts && `${mostLifts.value} <small>lifts</small>`,
       onDay(mostLifts, id => st(id).lifts), NA, "No lifts open"),
     mostRunsBox,
   ].join("");
@@ -631,7 +631,7 @@ async function renderHistoryDirectory() {
       </details>`;
   }
   html += `</div>
-    <p class="muted small legend">Most lifts / runs open: the best day of the ${unitWord(unit)} (date underneath).
+    <p class="muted small legend">Peak lifts / runs open: the most open on any one day of the ${unitWord(unit)} (that day underneath).
       Runs by grade: <span class="grade grade-green"></span> green <span class="grade grade-red"></span> red
       <span class="grade grade-black"></span> black <span class="grade grade-orange"></span> expert
       <span class="grade grade-other"></span> level not published.
