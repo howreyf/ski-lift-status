@@ -255,10 +255,10 @@ details[open] > summary.group-title::before { transform: rotate(45deg); }
 
 /* ---------------------------------------------------------------- resorts directory */
 
-/* Home: a top-down contour map of a mountain range covering the whole page. It stays put while
-   the page scrolls (fixed), so every part of the page has lines behind it; phones that don't
-   support fixed backgrounds stretch it over the whole page instead. */
-body.is-home {
+/* Every page: a top-down contour map of a mountain range covering the whole page. It stays put
+   while the page scrolls (fixed), so every part of the page has lines behind it; phones that
+   don't support fixed backgrounds stretch it over the whole page instead. */
+body {
   background-image: url(contours-light.svg);
   background-repeat: no-repeat;
   background-size: cover;
@@ -267,7 +267,7 @@ body.is-home {
   min-height: 100vh;
 }
 @media (prefers-color-scheme: dark) {
-  body.is-home { background-image: url(contours-dark.svg); }
+  body { background-image: url(contours-dark.svg); }
 }
 body.is-home > footer { display: none; } /* no small print on Home */
 .hero { margin: 0 0 12px; padding: 9vh 20px max(24vh, 170px); text-align: center; }

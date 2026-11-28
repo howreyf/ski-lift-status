@@ -38,7 +38,7 @@ Plain HTML/CSS/JavaScript, no build step. Pages (the part after `#` in the addre
 
 | Page | Address | What's on it |
 |---|---|---|
-| Home | `#/` | Large "Ski Status" title and a "Find resorts" button over a top-down contour map of a mountain range (`docs/contours-light.svg` / `contours-dark.svg`) that covers the whole page and stays put while it scrolls. No small print on Home, and the pinned resorts (up to 5) or, with none pinned, a prompt that leads to Resorts |
+| Home | `#/` | Large "Ski Status" title and a "Find resorts" button over the site's background: a top-down contour map of a mountain range (`docs/contours-light.svg` / `contours-dark.svg`) that covers the whole page and stays put while it scrolls (the same on every page). No small print on Home, and the pinned resorts (up to 5) or, with none pinned, a prompt that leads to Resorts |
 | Resorts | `#/resorts` | "Find resort" search with a Sort button, country buttons, pinned resorts, resort table in a dropdown per country (collapsible) with the regions as headings inside |
 | (Countries) | Resorts and Historical | Buttons under the search: "All countries" or any mix of Japan, Italy, Germany, Austria, USA, Canada (pinned resorts always show). Kept in the browser |
 | (Sort) | Resorts and Historical | Sort by number of runs or lifts, lifts or runs open, runs (or runs open) of one difficulty, snow depth, base temperature or night skiing; high to low or low to high; "Keep resorts in their countries" sorts inside each country dropdown, otherwise one list. N/A always last. Shared by both tabs, kept in the browser (`docs/sort.js`). On Historical the values are for the chosen period (peaks and means) |
