@@ -8,6 +8,10 @@
 # docs/data/lifts.json. That commit keeps the repository "active"; GitHub switches off
 # scheduled workflows in public repositories with no activity for 60 days.
 #
+# Alerts: if a resort's page fails for 6+ hours, or the daily record suddenly has far fewer
+# lifts/runs than usual, a GitHub issue is opened (GitHub emails you); it closes by itself
+# when the resort works again. See scraper/alerts.py.
+#
 # To run it by hand: GitHub -> Actions -> "Lift scrape" -> "Run workflow".
 
 name: Lift scrape
@@ -34,6 +38,7 @@ on:
 
 permissions:
   contents: write  # needed to commit the data
+  issues: write    # needed to open/close alert issues
 
 concurrency:
   group: scrape    # never run two at once
@@ -44,9 +49,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
           cache: pip
@@ -63,7 +68,7 @@ jobs:
           fi
 
       - name: Scrape
-        run: python -m scraper.run ${{ inputs.daily && '--daily' || '' }} ${{ inputs.force && '--force' || '' }}
+        run: python -m scraper.run --alerts "$RUNNER_TEMP/alerts.json" ${{ inputs.daily && '--daily' || '' }} ${{ inputs.force && '--force' || '' }}
 
       - name: Commit new data
         run: |
@@ -78,3 +83,11 @@ jobs:
           # Someone may have pushed code while this ran; put the data commit on top of it.
           git pull --rebase
           git push
+
+      - name: Open or close alert issues
+        if: always()               # also when every resort failed
+        continue-on-error: true    # an alert problem must never fail the scrape
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OWNER: ${{ github.repository_owner }}
+        run: python -m scraper.alerts "$RUNNER_TEMP/alerts.json"

@@ -322,6 +322,26 @@ function runsAlertHtml(r, long = false) {
     : `<span class="alert-inline" title="${esc(text)}" role="img" aria-label="${esc(text)}">${ALERT_ICON}</span>`;
 }
 
+/** When the resort's status page has been failing: the time of the first failed check in a
+ *  row (live.json's failing_since), otherwise null. */
+function failingSince(id) {
+  return state.liveStatus?.results?.[id]?.failing_since || null;
+}
+
+/** Warning that the status shown may be out of date because the resort's page can't be read.
+ *  `long`: a sentence for the resort page; otherwise a small icon with a tooltip (tables). */
+function staleHtml(id, long = false) {
+  const since = failingSince(id);
+  if (!since) return "";
+  const shown = !!liveStatusFor(id) || !!todayResult(id)?.ok;
+  const text = `Couldn't reach the resort's status page since ${formatJst(since)}`;
+  return long
+    ? `<div class="stale-note" role="note">${ALERT_ICON}<span>${esc(text)} (it's checked every 45 min).${
+        shown ? " The lift and run status below is the last one we got, so it may be out of date." : ""}</span></div>`
+    : `<span class="alert-inline" title="${esc(text)}. Status may be out of date." role="img"
+        aria-label="${esc(text)}. Status may be out of date.">${ALERT_ICON}</span>`;
+}
+
 function runsHtml(result) {
   const runs = result?.runs || [];
   if (!result?.ok || !runs.length) return NA;
@@ -350,7 +370,7 @@ function resortCells(id, recentlyViewed = false) {
   const r = currentResult(id);
   return `
     <span class="cell cell-name">${recentlyViewed ? HISTORY_ICON : ""}${esc(info.name)}${nightIcon(nightSkiing(id, state.latestDate))}<span class="cell-note">${esc(info.region)}</span></span>
-    <span class="cell" data-label="Lifts open">${liftsHtml(id, r)}</span>
+    <span class="cell" data-label="Lifts open">${liftsHtml(id, r)}${staleHtml(id)}</span>
     <span class="cell" data-label="Runs open">${runsHtml(r)}</span>
     <span class="cell" data-label="Base temp" data-base-temp="${esc(id)}">${baseTempHtml(id)}</span>
     <span class="cell" data-label="Snow depth">${r?.ok ? num(r.snow_depth_cm, " cm") : NA}</span>`;
@@ -565,7 +585,7 @@ function renderDirectory() {
     html += `
       <section class="directory-region">
         <h2>${esc(region)}</h2>
-        <ul>${ids.map(id => `<li><a href="#/resort/${esc(id)}">${esc(state.index.resorts[id].name)}</a>${nightIcon(nightSkiing(id, state.latestDate))}</li>`).join("")}</ul>
+        <ul>${ids.map(id => `<li><a href="#/resort/${esc(id)}">${esc(state.index.resorts[id].name)}</a>${nightIcon(nightSkiing(id, state.latestDate))}${staleHtml(id)}</li>`).join("")}</ul>
       </section>`;
   }
   view.innerHTML = html + "</div>";
@@ -893,7 +913,8 @@ async function renderResortPage(id, date) {
       : `Historical record: <strong>${esc(formatDay(date))}</strong>`}${
       r?.source_updated ? ` · resort last updated ${esc(formatJst(r.source_updated))}` : ""}</p>
 
-    ${!r ? `<p class="warn">No data for this day.</p>` : !r.ok ? `<p class="warn">Couldn't read the resort's page this day.</p>` : ""}
+    ${isLatest ? staleHtml(id, true) : ""}
+    ${!r ? `<p class="warn">No data for this day.</p>` : !r.ok && !(isLatest && failingSince(id)) ? `<p class="warn">Couldn't read the resort's page this day.</p>` : ""}
     <div class="boxes">${boxesHtml(id, r, date, isLatest)}</div>
 
     ${r?.ok ? liftsTable(r.lifts, false, nightSkiing(id, date)) + runsTable(r.runs || [], false, r.lifts_open) : ""}

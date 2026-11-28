@@ -39,6 +39,7 @@ from pathlib import Path
 
 import yaml
 
+from scraper import alerts
 from scraper.common import RUN_STATUSES, STATUSES, fetch, now_jst
 from scraper.weather import LEVELS, PAST_DAYS, apply_temps, fetch_weather, has_location
 
@@ -325,7 +326,12 @@ def update_live(results: dict[str, dict], today: str, now_iso: str, path: Path =
     a resort that failed, or returned fewer lifts than earlier today (Hakuba Valley's afternoon
     page), keeps its earlier entry from today. `baseline` (today's permanent record) counts as
     "earlier today" for resorts live.json doesn't have yet. The file is only rewritten when a
-    status actually changed, so quiet runs don't create a commit. Returns True if rewritten."""
+    status actually changed, so quiet runs don't create a commit. Returns True if rewritten.
+
+    A resort whose page can't be read gets "failing_since": the time of the first failed run
+    in a row (kept across midnight, removed once the page works again). The website uses it
+    to warn that the status shown may be out of date; scraper/alerts.py opens an issue when
+    it has lasted for hours."""
     old = _read_json(path)
     same_day = old.get("date") == today
     previous = old.get("results", {}) if same_day else {}
@@ -333,7 +339,11 @@ def update_live(results: dict[str, dict], today: str, now_iso: str, path: Path =
     for rid, result in results.items():
         new, prev = live_entry(result), previous.get(rid) or (baseline or {}).get(rid)
         if prev and prev.get("ok") and (not new["ok"] or len(new["lifts"]) < len(prev["lifts"])):
-            new = prev
+            new = dict(prev)
+        new.pop("failing_since", None)
+        if not result["ok"]:
+            new["failing_since"] = (old.get("results", {}).get(rid) or {}).get("failing_since") or now_iso
+            new["error"] = result["error"]
         entries[rid] = new
     for rid, prev in previous.items():  # resorts not scraped this run (e.g. --only) stay as they were
         entries.setdefault(rid, prev)
@@ -367,6 +377,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--force", action="store_true", help="scrape even outside the season months")
     ap.add_argument("--daily", action="store_true",
                     help="also (re)write today's permanent daily record now, whatever the time")
+    ap.add_argument("--alerts", metavar="FILE",
+                    help="write problems (resorts failing for hours, missing lifts/runs) to FILE "
+                         "for scraper/alerts.py, which opens GitHub issues")
     args = ap.parse_args(argv)
 
     settings = load_settings()
@@ -436,6 +449,22 @@ def main(argv: list[str] | None = None) -> int:
     live_changed = update_live(results, today, now.isoformat(), baseline=baseline)
     print("Live status: changed, live.json updated." if live_changed else "Live status: no change.")
 
+    # Problems worth an alert: a resort failing for hours (any run); far fewer lifts/runs
+    # than usual (daily record only, so Hakuba's shorter afternoon page doesn't count).
+    live_now = _read_json(LIVE_PATH).get("results", {})
+    problems, checked = [], []
+    for resort in resorts:
+        rid, result = resort["id"], results[resort["id"]]
+        if p := alerts.down_problem(resort, live_now.get(rid), now):
+            problems.append(p)
+        if result["ok"]:
+            checked.append(f"down:{rid}")
+            if write_daily:
+                checked += [f"drop-lifts:{rid}", f"drop-runs:{rid}"]
+                problems += alerts.drop_problems(resort, result, season, today)
+    for p in problems:
+        print(f"ALERT: {p['title']}")
+
     # 3. Once a day: the permanent record, weather and season summary.
     if write_daily:
         entry = index["seasons"].setdefault(label, {})
@@ -475,6 +504,8 @@ def main(argv: list[str] | None = None) -> int:
         save_index(index)
         print(f"Saved docs/data/{season_file(label)} and docs/data/lifts.json")
 
+    if args.alerts:
+        alerts.write_report(Path(args.alerts), problems, checked, now.isoformat())
     print(f"{len(resorts) - failures} ok, {failures} failed")
     # Exit with an error only if nothing worked, so partial results still get committed.
     return 1 if resorts and failures == len(resorts) else 0

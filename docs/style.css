@@ -516,6 +516,12 @@ td.num { white-space: nowrap; font-variant-numeric: tabular-nums; }
   border-radius: 8px; background: var(--hold-bg); color: var(--hold-fg); font-size: 12px; font-weight: 600;
 }
 .box-alert .alert-icon { color: currentColor; margin-top: 1px; }
+/* the resort's status page can't be read: what's shown may be out of date */
+.stale-note {
+  display: flex; align-items: flex-start; gap: 8px; margin: 0 0 14px; padding: 10px 12px;
+  border-radius: 10px; background: var(--hold-bg); color: var(--hold-fg); font-size: 14px; font-weight: 600;
+}
+.stale-note .alert-icon { color: currentColor; margin-top: 2px; }
 .graph-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); }
 .graph-tip {
   position: absolute; z-index: 5; min-width: 200px; max-width: 260px; padding: 10px 12px;

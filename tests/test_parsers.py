@@ -355,10 +355,29 @@ class TestLive(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "live.json"
             update_live({"a": self.result(["open", "open", "closed"]), "b": self.result(["open"])}, "2026-12-01", "t1", path)
-            self.assertFalse(update_live({"a": self.result(["closed"]), "b": self.result([], ok=False)}, "2026-12-01", "t2", path))
+            # b's first failure is a change (it starts "failing_since"); the status itself is kept
+            self.assertTrue(update_live({"a": self.result(["closed"]), "b": self.result([], ok=False)}, "2026-12-01", "t2", path))
             data = json.loads(path.read_text(encoding="utf-8"))
             self.assertEqual(len(data["results"]["a"]["lifts"]), 3)
             self.assertTrue(data["results"]["b"]["ok"])
+            self.assertEqual(data["results"]["b"]["failing_since"], "t2")
+            self.assertNotIn("failing_since", data["results"]["a"])
+            # still failing: nothing new to commit
+            self.assertFalse(update_live({"a": self.result(["closed"]), "b": self.result([], ok=False)}, "2026-12-01", "t3", path))
+
+    def test_failing_since_kept_across_midnight_and_cleared_when_working(self):
+        import json, tempfile
+        from scraper.run import update_live
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "live.json"
+            update_live({"a": self.result([], ok=False)}, "2026-12-01", "2026-12-01T20:00:00+09:00", path)
+            update_live({"a": self.result([], ok=False)}, "2026-12-02", "2026-12-02T09:08:00+09:00", path)
+            data = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(data["results"]["a"]["failing_since"], "2026-12-01T20:00:00+09:00")
+            self.assertFalse(data["results"]["a"]["ok"])
+            self.assertTrue(update_live({"a": self.result(["open"])}, "2026-12-02", "2026-12-02T09:53:00+09:00", path))
+            data = json.loads(path.read_text(encoding="utf-8"))
+            self.assertNotIn("failing_since", data["results"]["a"])
 
     def test_todays_daily_record_is_the_baseline_for_a_new_live_file(self):
         import json, tempfile
@@ -378,6 +397,46 @@ class TestLive(unittest.TestCase):
             self.assertTrue(update_live({"a": self.result(["closed"])}, "2026-12-02", "t2", path))  # new day: no carry-over
             data = json.loads(path.read_text(encoding="utf-8"))
             self.assertEqual((data["date"], len(data["results"]["a"]["lifts"])), ("2026-12-02", 1))
+
+
+class TestAlerts(unittest.TestCase):
+    """scraper/alerts.py: GitHub issues when a resort's scraper looks broken."""
+    RESORT = {"id": "a", "name": "Resort A", "url": "https://example.com/", "parser": "a"}
+
+    def test_down_only_after_six_hours(self):
+        from datetime import datetime
+        from scraper.alerts import down_problem
+        entry = {"ok": False, "failing_since": "2026-12-01T09:08:00+09:00", "error": "ConnectTimeout"}
+        self.assertIsNone(down_problem(self.RESORT, entry, datetime.fromisoformat("2026-12-01T14:00:00+09:00")))
+        p = down_problem(self.RESORT, entry, datetime.fromisoformat("2026-12-01T15:08:00+09:00"))
+        self.assertEqual(p["key"], "down:a")
+        self.assertIn("1 Dec 09:08 JST", p["title"])
+        self.assertIn("ConnectTimeout", p["body"])
+        self.assertIsNone(down_problem(self.RESORT, {"ok": True}, datetime.fromisoformat("2026-12-01T15:08:00+09:00")))
+
+    def test_drop_compares_with_most_seen_this_season(self):
+        from scraper.alerts import drop_problems
+        day = lambda date, lifts, runs: {"date": date, "results": {"a": {"ok": True, "lifts": [{}] * lifts, "runs": [{}] * runs}}}
+        season = {"days": [day("2026-12-01", 12, 20), day("2026-12-02", 10, 20)]}
+        today = lambda lifts, runs: {"ok": True, "lifts": [{}] * lifts, "runs": [{}] * runs}
+        self.assertEqual(drop_problems(self.RESORT, today(12, 20), season, "2026-12-03"), [])
+        self.assertEqual(drop_problems(self.RESORT, today(9, 15), season, "2026-12-03"), [])   # 75% is fine
+        keys = [p["key"] for p in drop_problems(self.RESORT, today(5, 0), season, "2026-12-03")]
+        self.assertEqual(keys, ["drop-lifts:a", "drop-runs:a"])
+        # a resort that never lists runs is never "missing" them
+        no_runs = {"days": [day("2026-12-01", 12, 0)]}
+        self.assertEqual(drop_problems(self.RESORT, today(12, 0), no_runs, "2026-12-03"), [])
+
+    def test_plan_opens_new_closes_fixed_and_leaves_unchecked(self):
+        from scraper.alerts import plan
+        open_issues = [{"number": 1, "body": "x <!-- alert-key: down:a -->"},
+                       {"number": 2, "body": "x <!-- alert-key: down:b -->"},
+                       {"number": 3, "body": "x <!-- alert-key: drop-lifts:c -->"}]
+        report = {"problems": [{"key": "down:a"}, {"key": "down:d"}],
+                  "checked": ["down:b", "down:c"]}  # drop-lifts:c not checked (not a daily run)
+        create, close = plan(open_issues, report)
+        self.assertEqual([p["key"] for p in create], ["down:d"])
+        self.assertEqual(close, [(2, "down:b")])
 
     def test_daily_record_written_by_first_run_after_0930(self):
         from scraper.run import daily_due

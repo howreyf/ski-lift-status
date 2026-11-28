@@ -123,7 +123,14 @@ prevents that, so the schedule keeps running from one season to the next with no
 
 ## When a resort changes its website
 
-1. The scraper prints `FAILED` for that resort, and the website shows "Couldn't read the resort's page".
+1. The scraper prints `FAILED` for that resort. The website keeps showing the last status it got,
+   with a warning ("Couldn't reach the resort's status page since …") on the resort page and a ⚠ in the tables.
+   You'll also get an email: a GitHub issue labelled **scraper alert** is opened when
+   - a resort has failed on every run for 6 hours or more, or
+   - the day's record lists far fewer lifts or runs than usual (under 75% of the most seen this season),
+     which usually means the page layout changed and the parser misses some.
+
+   The issue closes by itself once the resort works again (`scraper/alerts.py`).
 2. Save the new page over `tests/fixtures/<resort>.html`.
 3. Fix `scraper/parsers/<resort>.py` until `python -m unittest -v` passes.
 
