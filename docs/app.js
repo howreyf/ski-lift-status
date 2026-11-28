@@ -322,10 +322,14 @@ function runsAlertHtml(r, long = false) {
     : `<span class="alert-inline" title="${esc(text)}" role="img" aria-label="${esc(text)}">${ALERT_ICON}</span>`;
 }
 
-/** When the resort's status page has been failing: the time of the first failed check in a
- *  row (live.json's failing_since), otherwise null. */
+const STALE_WARNING_HOURS = 48; // warn on the site only after 2 days of failed checks
+
+/** When the resort's status page has been failing for at least STALE_WARNING_HOURS: the time
+ *  of the first failed check in a row (live.json's failing_since), otherwise null. Shorter
+ *  outages show nothing (the last status we got is usually still close enough). */
 function failingSince(id) {
-  return state.liveStatus?.results?.[id]?.failing_since || null;
+  const since = state.liveStatus?.results?.[id]?.failing_since;
+  return since && Date.now() - new Date(since).getTime() >= STALE_WARNING_HOURS * 3600e3 ? since : null;
 }
 
 /** Warning that the status shown may be out of date because the resort's page can't be read.
