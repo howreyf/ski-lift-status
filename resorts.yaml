@@ -76,6 +76,11 @@ areas:
     website: https://www.niseko.ne.jp/en/
     url: https://www.niseko.ne.jp/en/niseko-lift-status/
     map: { type: page, url: "https://www.niseko.ne.jp/en/map/", note: "Niseko United trail maps" }
+  - id: hakuba-valley
+    name: Hakuba Valley
+    resorts: [hakuba-goryu, hakuba-47, hakuba-happo-one]
+    website: https://www.hakubavalley.com/en/
+    url: http://hakubavalley.com/en/weather_en/
 
 resorts:
   # --- Hokkaido ---

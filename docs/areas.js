@@ -8,7 +8,7 @@
 //   lifts/runs open     totals
 //   snow depth, new snow, temperatures, season summary values   averages of the resorts
 // The area pages add the list of its resorts (with buttons to their pages and "+ Compare") and a
-// "Compare all" button that loads every resort of the area into Compare's graph.
+// "Compare all" button that replaces Compare's list with every resort of the area (graph mode).
 // Loaded before app.js; uses its helpers at run time.
 
 "use strict";
@@ -227,18 +227,13 @@ function setupAreaButtons(aid, period) {
   });
 }
 
-/** Load every resort of the area into Compare (graph mode) for the period's season and open
- *  it. Resorts already there stay, unless there's no room for all of the area's. */
+/** Replace whatever was in Compare with every resort of the area (for the period's season)
+ *  and open Compare's graph. */
 function compareArea(aid, unit, value) {
   const s = compareState({ defaults: false });
   const c = compareUnitOf(unit, value);
   const season = c.unit === "season" ? c.value : seasonOf(`${c.value}-15`);
-  const members = membersOf(aid);
-  const has = id => s.items.some(x => x.id === id && x.season === season);
-  const missing = members.filter(id => !has(id));
-  if (s.items.length + missing.length > MAX_ITEMS) s.items = s.items.filter(x => members.includes(x.id) && x.season === season);
-  for (const id of members) if (!has(id)) s.items.push({ id, season });
-  s.items = s.items.slice(0, MAX_ITEMS);
+  s.items = membersOf(aid).slice(0, MAX_ITEMS).map(id => ({ id, season }));
   s.mode = "graph";
   if (c.unit === "season") s.range = { kind: "season" };
   else { const m = Number(c.value.slice(5)); s.range = { kind: "months", from: m, to: m }; }

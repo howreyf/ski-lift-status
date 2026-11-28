@@ -255,15 +255,16 @@ details[open] > summary.group-title::before { transform: rotate(45deg); }
 
 /* ---------------------------------------------------------------- resorts directory */
 
-/* Home: a 3D contour drawing of a mountain range behind the whole page */
+/* Home: a top-down contour map of a mountain range covering the whole page. It stays put while
+   the page scrolls (fixed), so every part of the page has lines behind it; phones that don't
+   support fixed backgrounds stretch it over the whole page instead. */
 body.is-home {
-  /* drawn at least 1100px wide; placed so the summit (about 25% down the drawing) sits just
-     below the Find resorts button, and the range runs down the rest of the page */
-  --bgw: max(100vw, 1100px);
   background-image: url(contours-light.svg);
   background-repeat: no-repeat;
-  background-size: var(--bgw) auto;
-  background-position: center calc(270px + 9vh - var(--bgw) * 0.159);
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  min-height: 100vh;
 }
 @media (prefers-color-scheme: dark) {
   body.is-home { background-image: url(contours-dark.svg); }

@@ -38,7 +38,7 @@ Plain HTML/CSS/JavaScript, no build step. Pages (the part after `#` in the addre
 
 | Page | Address | What's on it |
 |---|---|---|
-| Home | `#/` | Large "Ski Status" title and a "Find resorts" button, over a 3D contour drawing of a mountain range that runs behind the whole page (`docs/contours-light.svg` / `contours-dark.svg`: stacked contour layers seen diagonally from above and from a corner, higher layers hiding the ones behind). No small print on Home, and the pinned resorts (up to 5) or, with none pinned, a prompt that leads to Resorts |
+| Home | `#/` | Large "Ski Status" title and a "Find resorts" button over a top-down contour map of a mountain range (`docs/contours-light.svg` / `contours-dark.svg`) that covers the whole page and stays put while it scrolls. No small print on Home, and the pinned resorts (up to 5) or, with none pinned, a prompt that leads to Resorts |
 | Resorts | `#/resorts` | "Find resort" search with a Sort button, country buttons, pinned resorts, resort table in a dropdown per country (collapsible) with the regions as headings inside |
 | (Countries) | Resorts and Historical | Buttons under the search: "All countries" or any mix of Japan, Italy, Germany, Austria, USA, Canada (pinned resorts always show). Kept in the browser |
 | (Sort) | Resorts and Historical | Sort by number of runs or lifts, lifts or runs open, runs (or runs open) of one difficulty, snow depth, base temperature or night skiing; high to low or low to high; "Keep resorts in their countries" sorts inside each country dropdown, otherwise one list. N/A always last. Shared by both tabs, kept in the browser (`docs/sort.js`). On Historical the values are for the chosen period (peaks and means) |
@@ -49,13 +49,13 @@ Plain HTML/CSS/JavaScript, no build step. Pages (the part after `#` in the addre
 
 | Compare | `#/compare` | One list of up to 10 resorts, each with a season (e.g. 26-27), shared by both modes, and one time range at the top for all of them: Season (each resort's whole season) or Month, from one month to another (e.g. December–January of each resort's own season). Graph mode: a line each, seasons lined up by date; choose the data point and "As a percentage". Side-by-side mode: a column each, sections open together |
 
-**Connected resorts (areas):** `areas:` in `resorts.yaml` (now Niseko United = Grand Hirafu,
-Annupuri, Village and Hanazono) shows the resorts as ONE row on Resorts and Historical, with
+**Connected resorts (areas):** `areas:` in `resorts.yaml` (Niseko United = Grand Hirafu,
+Annupuri, Village and Hanazono; Hakuba Valley = Hakuba Goryu, Hakuba 47 and Happo-one) shows the resorts as ONE row on Resorts and Historical, with
 one present page (`#/resort/niseko-united`) and one history page (`#/history/niseko-united/...`).
 Lifts and runs are totals (each named with its resort), snow depth, new snow, temperatures and
 season summary values are averages of the resorts (`docs/areas.js`, combined in the browser from
 the resorts' records). The area pages list its resorts with "Open ›" and "+ Compare" buttons, and
-"Compare all" loads all of them into Compare's graph (for that season). Each resort keeps its own
+"Compare all" empties Compare and loads just the area's resorts into its graph (for that season). Each resort keeps its own
 pages ("part of Niseko United" links back), search results and Compare entries.
 
 **After hours:** resorts mark lifts closed once they shut for the day. The live files remember
