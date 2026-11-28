@@ -1,14 +1,13 @@
 {
- "last_updated": "2026-11-28T10:11:08+09:00",
- "last_checked": "2026-11-28T10:11:08+09:00",
- "season_months": {
-  "start": 11,
-  "end": 5
- },
+ "last_updated": "2026-11-28T07:02:05+00:00",
+ "last_checked": "2026-11-28T07:02:05+00:00",
  "resorts": {
   "niseko-hirafu": {
    "name": "Niseko Grand Hirafu",
    "region": "Hokkaido",
+   "country": "Japan",
+   "group": "japan",
+   "timezone": "Asia/Tokyo",
    "source_url": "https://www.grand-hirafu.jp/snow/status/",
    "website": "https://en.grand-hirafu.jp/",
    "map": {
@@ -35,9 +34,78 @@
     "base": 260
    }
   },
+  "niseko-annupuri": {
+   "name": "Niseko Annupuri",
+   "region": "Hokkaido",
+   "country": "Japan",
+   "group": "japan",
+   "timezone": "Asia/Tokyo",
+   "source_url": "https://www.niseko.ne.jp/en/niseko-lift-status/#tag_annupuri",
+   "website": "https://annupuri.info/en/",
+   "map": {
+    "type": "page",
+    "url": "https://www.niseko.ne.jp/en/map/annupuri/",
+    "note": "Trail map on the Niseko United site"
+   },
+   "location": {
+    "lat": 42.86,
+    "lon": 140.66
+   },
+   "elevation_m": {
+    "summit": 1160,
+    "base": 300
+   }
+  },
+  "niseko-village": {
+   "name": "Niseko Village",
+   "region": "Hokkaido",
+   "country": "Japan",
+   "group": "japan",
+   "timezone": "Asia/Tokyo",
+   "source_url": "https://www.niseko.ne.jp/en/niseko-lift-status/#tag_village",
+   "website": "https://www.niseko-village.com/en/",
+   "map": {
+    "type": "page",
+    "url": "https://www.niseko.ne.jp/en/map/village/",
+    "note": "Trail map on the Niseko United site"
+   },
+   "location": {
+    "lat": 42.83,
+    "lon": 140.69
+   },
+   "elevation_m": {
+    "summit": 1170,
+    "base": 255
+   }
+  },
+  "niseko-hanazono": {
+   "name": "Niseko Hanazono",
+   "region": "Hokkaido",
+   "country": "Japan",
+   "group": "japan",
+   "timezone": "Asia/Tokyo",
+   "source_url": "https://hanazononiseko.com/en/winter/resort/lift-status",
+   "website": "https://hanazononiseko.com/en/winter",
+   "map": {
+    "type": "page",
+    "url": "https://www.niseko.ne.jp/en/map/hanazono/",
+    "note": "Trail map on the Niseko United site"
+   },
+   "location": {
+    "lat": 42.9,
+    "lon": 140.71
+   },
+   "elevation_m": {
+    "summit": 1180,
+    "base": 308
+   }
+  },
   "kiroro": {
    "name": "Kiroro",
    "region": "Hokkaido",
+   "country": "Japan",
+   "group": "japan",
+   "timezone": "Asia/Tokyo",
    "source_url": "https://www.kiroro.co.jp/dashboard/",
    "website": "https://www.kiroro.co.jp/en/",
    "map": {
@@ -57,6 +125,9 @@
   "rusutsu": {
    "name": "Rusutsu",
    "region": "Hokkaido",
+   "country": "Japan",
+   "group": "japan",
+   "timezone": "Asia/Tokyo",
    "source_url": "https://rusutsu.com/en/lift-and-trail-status/",
    "website": "https://rusutsu.com/en/",
    "map": {
@@ -75,6 +146,9 @@
   "furano": {
    "name": "Furano",
    "region": "Hokkaido",
+   "country": "Japan",
+   "group": "japan",
+   "timezone": "Asia/Tokyo",
    "source_url": "https://furapuri.com/ski/",
    "website": "https://www.princehotels.com/en/ski/furano/",
    "map": {
@@ -94,6 +168,9 @@
   "tomamu": {
    "name": "Tomamu",
    "region": "Hokkaido",
+   "country": "Japan",
+   "group": "japan",
+   "timezone": "Asia/Tokyo",
    "source_url": "https://www.snowtomamu.jp/winter/en/ski/ski-slope/condition/",
    "website": "https://www.snowtomamu.jp/winter/en/",
    "map": {
@@ -112,6 +189,9 @@
   "sapporo-kokusai": {
    "name": "Sapporo Kokusai",
    "region": "Hokkaido",
+   "country": "Japan",
+   "group": "japan",
+   "timezone": "Asia/Tokyo",
    "source_url": "https://www.sapporo-kokusai.jp/en/slopes/",
    "website": "https://www.sapporo-kokusai.jp/en/",
    "map": {
@@ -130,6 +210,9 @@
   "sapporo-teine": {
    "name": "Sapporo Teine",
    "region": "Hokkaido",
+   "country": "Japan",
+   "group": "japan",
+   "timezone": "Asia/Tokyo",
    "source_url": "https://sapporo-teine.com/snow/gelande-report-en",
    "website": "https://sapporo-teine.com/snow/lang/en/",
    "map": {
@@ -148,6 +231,9 @@
   "shiga-kogen": {
    "name": "Shiga Kogen",
    "region": "Nagano",
+   "country": "Japan",
+   "group": "japan",
+   "timezone": "Asia/Tokyo",
    "source_url": "https://www.shigakogen.gr.jp/english/lift_information/",
    "website": "https://www.shigakogen.gr.jp/english/index.html",
    "map": {
@@ -167,6 +253,9 @@
   "hakuba-goryu": {
    "name": "Hakuba Goryu",
    "region": "Nagano",
+   "country": "Japan",
+   "group": "japan",
+   "timezone": "Asia/Tokyo",
    "source_url": "http://hakubavalley.com/en/weather_en/",
    "website": "https://www.s-goryu.com/",
    "map": {
@@ -198,6 +287,9 @@
   "hakuba-47": {
    "name": "Hakuba 47",
    "region": "Nagano",
+   "country": "Japan",
+   "group": "japan",
+   "timezone": "Asia/Tokyo",
    "source_url": "http://hakubavalley.com/en/weather_en/",
    "website": "https://hakuba47.co.jp/",
    "map": {
@@ -216,6 +308,9 @@
   "hakuba-happo-one": {
    "name": "Hakuba Happo-one",
    "region": "Nagano",
+   "country": "Japan",
+   "group": "japan",
+   "timezone": "Asia/Tokyo",
    "source_url": "http://hakubavalley.com/en/weather_en/",
    "website": "https://www.happo-one.jp/",
    "map": {
@@ -234,6 +329,9 @@
   "nozawa-onsen": {
    "name": "Nozawa Onsen",
    "region": "Nagano",
+   "country": "Japan",
+   "group": "japan",
+   "timezone": "Asia/Tokyo",
    "source_url": "https://en.nozawaski.com/the-mountain/moutain-info/slopes-lifts/",
    "website": "https://en.nozawaski.com/",
    "map": {
@@ -262,6 +360,9 @@
   "gala-yuzawa": {
    "name": "GALA Yuzawa",
    "region": "Niigata",
+   "country": "Japan",
+   "group": "japan",
+   "timezone": "Asia/Tokyo",
    "source_url": "https://gala.co.jp/winter/gelande/?wovn=en",
    "website": "https://gala.co.jp/winter/?wovn=en",
    "map": {
@@ -280,6 +381,9 @@
   "zao-onsen": {
    "name": "Zao Onsen",
    "region": "Yamagata",
+   "country": "Japan",
+   "group": "japan",
+   "timezone": "Asia/Tokyo",
    "source_url": "https://zaomountainresort.com/ski/",
    "website": "https://zaomountainresort.com/",
    "map": {
@@ -293,6 +397,182 @@
    "elevation_m": {
     "summit": 1661,
     "base": 780
+   }
+  },
+  "breuil-cervinia": {
+   "name": "Breuil-Cervinia",
+   "region": "Aosta Valley",
+   "country": "Italy",
+   "group": "europe",
+   "timezone": "Europe/Rome",
+   "source_url": "https://www.cervinia.it/en/impianti",
+   "website": "https://www.cervinia.it/en",
+   "map": {
+    "type": "page",
+    "url": "https://www.cervinia.it/en/skirama",
+    "note": "Skirama: the Cervino Ski Paradise map"
+   },
+   "location": {
+    "lat": 45.936,
+    "lon": 7.63
+   },
+   "elevation_m": {
+    "summit": 3480,
+    "base": 2050
+   }
+  },
+  "livigno": {
+   "name": "Livigno",
+   "region": "Lombardy",
+   "country": "Italy",
+   "group": "europe",
+   "timezone": "Europe/Rome",
+   "source_url": "https://www.skipasslivigno.com/en/lifts-and-slopes/",
+   "website": "https://www.livigno.eu/en",
+   "map": {
+    "type": "pdf",
+    "url": "https://www.skipasslivigno.com/app/uploads/2020/07/livigno-mappa-impianti-sci-piste-neve-inverno-skipass.pdf",
+    "note": "Livigno lifts and slopes map from Skipass Livigno"
+   },
+   "location": {
+    "lat": 46.538,
+    "lon": 10.135
+   },
+   "elevation_m": {
+    "summit": 2797,
+    "base": 1816
+   }
+  },
+  "zugspitze": {
+   "name": "Zugspitze",
+   "region": "Bavaria",
+   "country": "Germany",
+   "group": "europe",
+   "timezone": "Europe/Berlin",
+   "source_url": "https://zugspitze.de/en/Service-information/Facilities",
+   "website": "https://zugspitze.de/en",
+   "map": {
+    "type": "pdf",
+    "url": "https://zugspitze.de/Downloads/%C3%9Cbersichtskarten/Pistenplan_Zugspitze_Legende.pdf",
+    "note": "Zugspitze piste map"
+   },
+   "location": {
+    "lat": 47.406,
+    "lon": 10.985
+   },
+   "elevation_m": {
+    "summit": 2720,
+    "base": 2000
+   }
+  },
+  "zell-am-see-kaprun": {
+   "name": "Zell am See-Kaprun",
+   "region": "Salzburg",
+   "country": "Austria",
+   "group": "europe",
+   "timezone": "Europe/Vienna",
+   "source_url": "https://www.zellamsee-kaprun.com/en/service/live/pistes",
+   "website": "https://www.zellamsee-kaprun.com/en",
+   "map": {
+    "type": "page",
+    "url": "https://www.zellamsee-kaprun.com/en/sport/winter/skimap",
+    "note": "Skimap"
+   },
+   "location": {
+    "lat": 47.26,
+    "lon": 12.72
+   },
+   "elevation_m": {
+    "summit": 3029,
+    "base": 760
+   }
+  },
+  "big-sky": {
+   "name": "Big Sky",
+   "region": "Montana",
+   "country": "USA",
+   "group": "north-america",
+   "timezone": "America/Denver",
+   "source_url": "https://www.bigskyresort.com/current-conditions",
+   "website": "https://www.bigskyresort.com/",
+   "map": {
+    "type": "page",
+    "url": "https://www.bigskyresort.com/trail-maps",
+    "note": "Trail maps"
+   },
+   "location": {
+    "lat": 45.284,
+    "lon": -111.401
+   },
+   "elevation_m": {
+    "summit": 3403,
+    "base": 2072
+   }
+  },
+  "aspen-mountain": {
+   "name": "Aspen Mountain",
+   "region": "Colorado",
+   "country": "USA",
+   "group": "north-america",
+   "timezone": "America/Denver",
+   "source_url": "https://www.aspensnowmass.com/four-mountains/aspen-mountain/snow-and-grooming-report",
+   "website": "https://www.aspensnowmass.com/four-mountains/aspen-mountain",
+   "map": {
+    "type": "page",
+    "url": "https://www.aspensnowmass.com/four-mountains/aspen-mountain/trail-maps",
+    "note": "Trail map"
+   },
+   "location": {
+    "lat": 39.186,
+    "lon": -106.818
+   },
+   "elevation_m": {
+    "summit": 3418,
+    "base": 2422
+   }
+  },
+  "jackson-hole": {
+   "name": "Jackson Hole",
+   "region": "Wyoming",
+   "country": "USA",
+   "group": "north-america",
+   "timezone": "America/Denver",
+   "source_url": "https://www.jacksonhole.com/mountain-report#lifts-deck",
+   "website": "https://www.jacksonhole.com/",
+   "map": {
+    "type": "page",
+    "url": "https://www.jacksonhole.com/maps/mountain-winter",
+    "note": "Trail maps"
+   },
+   "location": {
+    "lat": 43.588,
+    "lon": -110.828
+   },
+   "elevation_m": {
+    "summit": 3185,
+    "base": 1924
+   }
+  },
+  "whistler-blackcomb": {
+   "name": "Whistler Blackcomb",
+   "region": "British Columbia",
+   "country": "Canada",
+   "group": "north-america",
+   "timezone": "America/Vancouver",
+   "source_url": "https://www.whistlerblackcomb.com/the-mountain/mountain-conditions/terrain-and-lift-status.aspx",
+   "website": "https://www.whistlerblackcomb.com/",
+   "map": {
+    "type": "page",
+    "url": "https://www.whistlerblackcomb.com/the-mountain/about-the-mountain/trail-maps.aspx",
+    "note": "Trail map"
+   },
+   "location": {
+    "lat": 50.107,
+    "lon": -122.943
+   },
+   "elevation_m": {
+    "summit": 2284,
+    "base": 653
    }
   }
  },
@@ -351,7 +631,7 @@
      "runs_total": 24,
      "snow_depth_max_cm": 100,
      "snow_depth_max_date": "2026-11-27",
-     "days_recorded": 1,
+     "days_recorded": 2,
      "summit_min_c": -4.3,
      "summit_max_c": 3.2,
      "base_min_c": 0.0,
@@ -597,9 +877,118 @@
      "summit_mean_c": 8.0,
      "base_mean_c": 12.4,
      "snow_depth_mean_cm": null
+    },
+    "niseko-annupuri": {
+     "lifts_total": 6,
+     "runs_total": 13,
+     "snow_depth_max_cm": 30,
+     "snow_depth_max_date": "2026-11-28",
+     "summit_min_c": null,
+     "summit_max_c": null,
+     "summit_lowest_mean_c": null,
+     "summit_highest_mean_c": null,
+     "base_min_c": null,
+     "base_max_c": null,
+     "base_lowest_mean_c": null,
+     "base_highest_mean_c": null,
+     "summit_mean_c": null,
+     "base_mean_c": null,
+     "snow_depth_mean_cm": 30.0,
+     "new_snow_min_cm": null,
+     "new_snow_max_cm": null,
+     "new_snow_mean_cm": null,
+     "days_recorded": 1
+    },
+    "niseko-village": {
+     "lifts_total": 8,
+     "runs_total": 28,
+     "snow_depth_max_cm": 183,
+     "snow_depth_max_date": "2026-11-28",
+     "summit_min_c": null,
+     "summit_max_c": null,
+     "summit_lowest_mean_c": null,
+     "summit_highest_mean_c": null,
+     "base_min_c": null,
+     "base_max_c": null,
+     "base_lowest_mean_c": null,
+     "base_highest_mean_c": null,
+     "summit_mean_c": null,
+     "base_mean_c": null,
+     "snow_depth_mean_cm": 183.0,
+     "new_snow_min_cm": null,
+     "new_snow_max_cm": null,
+     "new_snow_mean_cm": null,
+     "days_recorded": 1
+    },
+    "niseko-hanazono": {
+     "lifts_total": 4,
+     "runs_total": 12,
+     "snow_depth_max_cm": 37,
+     "snow_depth_max_date": "2026-11-28",
+     "summit_min_c": null,
+     "summit_max_c": null,
+     "summit_lowest_mean_c": null,
+     "summit_highest_mean_c": null,
+     "base_min_c": null,
+     "base_max_c": null,
+     "base_lowest_mean_c": null,
+     "base_highest_mean_c": null,
+     "summit_mean_c": null,
+     "base_mean_c": null,
+     "snow_depth_mean_cm": 37.0,
+     "new_snow_min_cm": null,
+     "new_snow_max_cm": null,
+     "new_snow_mean_cm": null,
+     "days_recorded": 1
     }
+   },
+   "files": {
+    "japan": "seasons/2026-27.json",
+    "europe": "seasons/europe/2026-27.json",
+    "north-america": "seasons/north-america/2026-27.json"
+   },
+   "dates_by_group": {
+    "japan": [
+     "2026-11-27",
+     "2026-11-28"
+    ],
+    "europe": [],
+    "north-america": []
    }
   }
  },
- "daily_time": "09:30"
+ "daily_time": "09:30",
+ "groups": {
+  "japan": {
+   "name": "Japan",
+   "live": "live.json",
+   "season_months": {
+    "start": 11,
+    "end": 5
+   }
+  },
+  "europe": {
+   "name": "Europe",
+   "live": "live-europe.json",
+   "season_months": {
+    "start": 10,
+    "end": 5
+   }
+  },
+  "north-america": {
+   "name": "North America",
+   "live": "live-north-america.json",
+   "season_months": {
+    "start": 11,
+    "end": 5
+   }
+  }
+ },
+ "schedule": {
+  "hours": [
+   "09:00",
+   "21:00"
+  ],
+  "daily_time": "09:30"
+ }
 }
