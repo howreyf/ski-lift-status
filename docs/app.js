@@ -373,7 +373,7 @@ function resortCells(id, recentlyViewed = false) {
   const info = state.index.resorts[id];
   const r = currentResult(id);
   return `
-    <span class="cell cell-name">${recentlyViewed ? HISTORY_ICON : ""}${esc(info.name)}${nightIcon(nightSkiing(id, state.latestDate))}<span class="cell-note">${esc(info.region)}</span></span>
+    <span class="cell cell-name">${recentlyViewed ? HISTORY_ICON : ""}${esc(info.name)}${nightIcon(nightSkiing(id, state.latestDate))}<span class="cell-note">${esc(info.region)}</span>${sortNoteHtml(id)}</span>
     <span class="cell" data-label="Lifts open">${liftsHtml(id, r)}${staleHtml(id)}</span>
     <span class="cell" data-label="Runs open">${runsHtml(r)}</span>
     <span class="cell" data-label="Base temp" data-base-temp="${esc(id)}">${baseTempHtml(id)}</span>
@@ -568,28 +568,13 @@ function renderHome() {
 
 /** Resorts tab: every resort's status today, with search, pins and regions. */
 function renderResorts() {
-  const pinned = pins.list();
-  const closed = closedRegions();
   let html = `
     <h1 class="page-title">Resorts</h1>
     ${updatedLine()}
-    ${searchHtml()}
+    ${searchRowHtml(false)}
     <div class="resort-table">
-      ${TABLE_HEAD}`;
-  if (pinned.length) {
-    html += `
-      <section class="group group-pinned">
-        <h2 class="group-title">${pinIcon(true)} Pinned <span class="count">${pinned.length} / ${MAX_PINS}</span></h2>
-        ${pinned.map(resortRow).join("")}
-      </section>`;
-  }
-  for (const [region, ids] of regions()) {
-    html += `
-      <details class="group region" data-region="${esc(region)}"${closed.includes(region) ? "" : " open"}>
-        <summary class="group-title">${esc(region)} <span class="count">${ids.length}</span></summary>
-        ${ids.map(resortRow).join("")}
-      </details>`;
-  }
+      ${TABLE_HEAD}
+      ${resortGroupsHtml(resortRow, presentSortValue, false)}`;
   html += `</div>
     <p class="muted small legend">Runs open by grade:
       <span class="grade grade-green"></span> green
@@ -600,6 +585,7 @@ function renderResorts() {
       Partly open runs count as open.</p>`;
   view.innerHTML = html;
   setupSearch(view);
+  setupSort(view, renderResorts);
 
   view.querySelectorAll("button[data-pin]").forEach(btn => btn.addEventListener("click", () => {
     if (pins.toggle(btn.dataset.pin)) renderResorts();
@@ -977,6 +963,7 @@ function route(scrollTop = true) {
     else a.removeAttribute("aria-current");
   });
   currentPage = null;
+  if (scrollTop) sortPanelOpen = false; // a real page change closes the Sort panel
   if (page !== "history" && historyUI) { historyUI.graph?.destroy(); historyUI = null; }
   if (page !== "compare" && compareGraph) { compareGraph.destroy(); compareGraph = null; }
   if (page === "history") id ? renderHistoryPage(decodeURIComponent(id), date, value) : renderHistoryDirectory();

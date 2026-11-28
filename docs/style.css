@@ -96,6 +96,39 @@ main { padding-top: 20px; padding-bottom: 8px; }
 /* ---------------------------------------------------------------- search */
 
 .search { position: relative; margin: 0 0 18px; }
+/* search box with the Sort button beside it */
+.search-row { display: flex; gap: 10px; align-items: flex-start; margin: 0 0 18px; }
+.search-row .search { flex: 1; min-width: 0; margin: 0; }
+.sort { position: relative; flex: none; }
+.sort-button {
+  display: inline-flex; align-items: center; gap: 6px; height: 44px; padding: 0 14px;
+  font: inherit; font-weight: 600; color: var(--text); background: var(--card);
+  border: 1px solid var(--line); border-radius: 10px; cursor: pointer; white-space: nowrap;
+}
+.sort-button:hover { border-color: var(--accent); }
+.sort-button.is-on { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.sort-pop {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: 300px; padding: 12px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow);
+}
+.sort-title { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
+.sort-opts { display: grid; gap: 2px; margin-bottom: 10px; }
+.sort-opt { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+.sort-opt:hover { background: var(--bg); }
+.sort-opt select {
+  margin-left: auto; font: inherit; font-size: 13px; color: var(--text); background: var(--card);
+  border: 1px solid var(--line); border-radius: 6px; padding: 2px 4px;
+}
+.sort-dir { display: flex; width: 100%; margin-bottom: 10px; }
+.sort-dir .seg-btn { flex: 1; white-space: nowrap; }
+.sort-check { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.sort-check input:disabled + * , .sort-check:has(input:disabled) { color: var(--muted); }
+.sort-note { display: block; margin-top: 2px; font-size: 12px; font-weight: 600; color: var(--accent); }
+.group-sorted .group-title { color: var(--accent); }
+@media (max-width: 680px) {
+  .sort-button span { max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
+  .sort-pop { width: min(300px, calc(100vw - 32px)); }
+}
 .search-icon { position: absolute; left: 12px; top: 13px; color: var(--muted); pointer-events: none; }
 .search-input {
   width: 100%; font: inherit; font-size: 16px;

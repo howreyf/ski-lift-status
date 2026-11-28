@@ -477,6 +477,7 @@ async function periodStatsFor(id, unit, value) {
   const source = snowSource(recs);
   const amounts = recs.map(x => snowAmount(x.r, source)).filter(v => v != null);
   return {
+    recs,
     days: recs.length,
     facts: unit === "season" ? await seasonFacts(id, value) : null,
     snowTotal: amounts.length ? Math.round(amounts.reduce((a, b) => a + b, 0)) : null,
@@ -497,7 +498,7 @@ function historyCells(id, recentlyViewed = false) {
   const on = (x, n) => n ? `<span class="cell-note">on ${esc(shortDay(x.date))}</span>` : "";
   const start = historyDir.unit ? periodRange(historyDir.unit, historyDir.value)[0] : state.latestDate;
   return `
-    <span class="cell cell-name">${recentlyViewed ? HISTORY_ICON : ""}${esc(info.name)}${nightIcon(nightSkiing(id, start))}<span class="cell-note">${esc(info.region)}</span></span>
+    <span class="cell cell-name">${recentlyViewed ? HISTORY_ICON : ""}${esc(info.name)}${nightIcon(nightSkiing(id, start))}<span class="cell-note">${esc(info.region)}</span>${sortNoteHtml(id)}</span>
     <span class="cell" data-label="Peak lifts open">${s.lifts
       ? `<strong>${s.lifts.r.lifts_open}</strong> / ${s.lifts.r.lifts.length}${on(s.lifts, s.lifts.r.lifts_open)}` : NA}</span>
     <span class="cell" data-label="Peak runs open">${s.runs
@@ -604,32 +605,17 @@ async function renderHistoryDirectory() {
   if (token !== historyDirToken || !/^#\/history\/?$/.test(location.hash)) return; // changed again, or navigated away
   Object.assign(historyDir, { unit, value, stats: Object.fromEntries(ids.map((id, i) => [id, stats[i]])) });
 
-  const pinned = pins.list();
-  const closed = closedRegions();
   const anyData = stats.some(s => s.days);
   let html = `
     <h1 class="page-title">Historical</h1>
     <div class="period" aria-label="Choose a period">${segHtml(DIRECTORY_UNITS, unit)}${pickerHtml(unit, value)}</div>
     <p class="muted small">Every resort over this ${unitWord(unit)}. Pick a resort for its full history, down to single weeks and days.</p>
     ${anyData ? `<div class="hl-boxes">${highlightBoxes(unit, value)}</div>` : ""}
-    ${searchHtml()}
+    ${searchRowHtml(true)}
     ${anyData ? "" : `<p class="warn">Nothing was recorded in ${esc(periodLabel(unit, value))}.</p>`}
     <div class="resort-table">
       ${HISTORY_TABLE_HEAD}`;
-  if (pinned.length) {
-    html += `
-      <section class="group group-pinned">
-        <h2 class="group-title">${pinIcon(true)} Pinned <span class="count">${pinned.length} / ${MAX_PINS}</span></h2>
-        ${pinned.map(historyRow).join("")}
-      </section>`;
-  }
-  for (const [region, regionIds] of regions()) {
-    html += `
-      <details class="group region" data-region="${esc(region)}"${closed.includes(region) ? "" : " open"}>
-        <summary class="group-title">${esc(region)} <span class="count">${regionIds.length}</span></summary>
-        ${regionIds.map(historyRow).join("")}
-      </details>`;
-  }
+  html += resortGroupsHtml(historyRow, historySortValue, true);
   html += `</div>
     <p class="muted small legend">Peak lifts / runs open: the most open on any one day of the ${unitWord(unit)} (that day underneath).
       Runs by grade: <span class="grade grade-green"></span> green <span class="grade grade-red"></span> red
@@ -644,6 +630,7 @@ async function renderHistoryDirectory() {
   }));
   setupPicker(view.querySelector(".picker"), unit, value, v => pick(unit, v));
   setupSearch(view, HISTORY_SEARCH);
+  setupSort(view, renderHistoryDirectory);
   view.querySelectorAll("button[data-pin]").forEach(btn => btn.addEventListener("click", () => {
     if (pins.toggle(btn.dataset.pin)) renderHistoryDirectory();
   }));
