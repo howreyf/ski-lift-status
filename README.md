@@ -40,10 +40,10 @@ Plain HTML/CSS/JavaScript, no build step. Pages (the part after `#` in the addre
 | Resorts | `#/resorts` | Search and a directory of all resorts by region |
 | One resort | `#/resort/<id>` | Boxes (lifts, runs, snow depth, new snow, base and summit temperature), lifts and runs lists, trail map |
 | One resort, past day | `#/resort/<id>/<YYYY-MM-DD>` | The same for a historical record (final temperatures, day's mean vs season) |
-| Historical | `#/history` | Search (season totals: lifts, runs by difficulty, mean base temperature and snow depth) and a directory |
-| A resort's history | `#/history/<id>/<unit>/<value>` | unit = `season` (2026-27), `month` (2026-12), `week` (the Sunday it starts) or `day`; period picker with search and ‹ › arrows; opening/closing day and first/last snow; lifts box that expands to the graph |
+| Historical | `#/history` | Season/Month picker at the top (remembers the last season or month chosen anywhere in Historical; first visit: latest season), search, and a table like Home with pins and region dropdowns: most lifts open, most runs open (by grade), mean base temperature, mean snow depth over that period. A resort opens its history at the same period |
+| A resort's history | `#/history/<id>/<unit>/<value>` | unit = `season` (2026-27), `month` (2026-12), `week` (the Sunday it starts) or `day`; period picker with search and ‹ › arrows; opening/closing day and first/last snow; lifts box that expands to the graph; "+ Compare" adds the resort and period to Compare (a week or day as its month): its name flies into the Compare tab, whose badge counts resorts added since Compare was last opened |
 
-| Compare | `#/compare` | Graph mode: up to 10 lines (a resort in a season each) on one graph, seasons lined up by date; choose the data point, "As a percentage", and whole season or a month range. Side-by-side mode: up to 5 resorts, each with its own season/month/week/day, sections open together |
+| Compare | `#/compare` | One list of up to 10 resorts, each with a season or a month, shared by both modes. Graph mode: a line each, seasons lined up by date; the time range follows the longest period (whole season if any resort is a season, otherwise earliest to latest month); choose the data point and "As a percentage". Side-by-side mode: a column each, sections open together |
 
 **Night skiing:** `night_skiing` in `resorts.yaml` (per season: dates, hours, lifts) shows a moon
 symbol beside the resort and its night lifts; hovering shows the dates.

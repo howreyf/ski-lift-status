@@ -965,7 +965,7 @@ function route(scrollTop = true) {
   if (page !== "history" && historyUI) { historyUI.graph?.destroy(); historyUI = null; }
   if (page !== "compare" && compareGraph) { compareGraph.destroy(); compareGraph = null; }
   if (page === "history") id ? renderHistoryPage(decodeURIComponent(id), date, value) : renderHistoryDirectory();
-  else if (page === "compare") renderCompare();
+  else if (page === "compare") { compareSeen(); renderCompare(); }
   else if (page === "resort" && id) renderResortPage(decodeURIComponent(id), /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : null);
   else if (page === "resorts") renderDirectory();
   else renderHome();
@@ -993,6 +993,7 @@ async function start() {
     const resp = await fetch("data/lifts.json", { cache: "no-cache" });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     state.index = await resp.json();
+    showCompareBadge(); // resorts added to Compare since it was last opened
     const labels = Object.keys(state.index.seasons || {}).sort();
     const label = labels[labels.length - 1];
     if (label) {

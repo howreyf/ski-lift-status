@@ -68,6 +68,25 @@ code { font-size: 13px; }
 }
 .tabs a:hover { background: var(--bg); color: var(--text); }
 .tabs a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); }
+.tabs a { position: relative; }
+
+/* number of resorts newly added to Compare, on the Compare tab */
+.tab-badge {
+  position: absolute; top: -5px; right: -6px;
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+  background: #d6336c; color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
+  box-shadow: 0 0 0 2px var(--card); pointer-events: none;
+}
+.tab-badge.pop { animation: badge-pop .45s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes badge-pop { 0% { transform: scale(0); } 60% { transform: scale(1.35); } 100% { transform: scale(1); } }
+/* the resort's name flying from the page title into the Compare tab */
+.fly-ghost {
+  position: fixed; z-index: 1000; pointer-events: none; white-space: nowrap;
+  margin: -2px 0 0 -10px; padding: 2px 10px; border-radius: 999px;
+  font-size: 24px; font-weight: 700; color: var(--accent); background: var(--accent-soft);
+  box-shadow: var(--shadow); will-change: transform, opacity;
+}
+@media (prefers-reduced-motion: reduce) { .tab-badge.pop { animation: none; } }
 
 main { padding-top: 20px; padding-bottom: 8px; }
 .page-title { font-size: 24px; margin: 0 0 4px; }
@@ -486,6 +505,8 @@ td.num { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .cmp-col-top { display: flex; gap: 6px; align-items: center; }
 .cmp-col-top select { flex: 1; min-width: 0; }
 .cmp-col-head .picker { min-width: 0; max-width: none; }
+.cmp-line .picker { min-width: 0; }
+.cmp-sync-note { margin: -6px 0 12px; }
 .cmp-section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 4px 12px; margin-bottom: 10px; }
 .cmp-section > summary { cursor: pointer; padding: 10px 0; font-weight: 700; color: var(--accent); }
 .cmp-section .cmp-grid { padding-bottom: 12px; }

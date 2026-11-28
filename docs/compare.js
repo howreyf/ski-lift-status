@@ -1,18 +1,21 @@
 // Compare tab (#/compare).
 //
-// Graph mode: up to 10 lines on one graph, each a resort in a season ("Niseko 26-27",
-//   "Niseko 25-26", "Kiroro 27-28" ...). Seasons are lined up by date (1 Dec of every season
-//   sits at the same place), so different seasons can be compared. Choose the data point,
-//   "As a percentage", and the time range (whole season, or from one month to another).
-// Side-by-side mode: up to 5 columns, each a resort and its own period (season / month /
-//   week / day, like the Historical pages). Sections (Overview, Lifts, Runs, Snow,
+// One shared list of up to 10 resorts, each with a season or a month ("Niseko, season 26-27",
+// "Kiroro, December 2026"). Both modes show the same list; changing it in one changes the other.
+// Graph mode: one line per resort, its season or month lined up by date (1 Dec of every season
+//   sits at the same place), so different seasons can be compared. The time range follows the
+//   longest period in the list: whole season if any resort is a season, otherwise from the
+//   earliest to the latest month. Choose the data point and "As a percentage".
+// Side-by-side mode: one column per resort. Sections (Overview, Lifts, Runs, Snow,
 //   Temperatures) open and close for every column at once.
-// Choices are kept in the visitor's browser. Loaded before app.js; uses history.js helpers.
+// Resorts are added here, or with "+ Compare" on a resort's Historical page (a week or day
+// is added as its month). Choices are kept in the visitor's browser. Loaded before app.js;
+// uses history.js helpers.
 
 "use strict";
 
-const MAX_LINES = 10;
-const MAX_COLUMNS = 5;
+const MAX_ITEMS = 10;
+const COMPARE_UNITS = ["season", "month"];
 // Reference categorical palette (validated for colour-blind separation, light and dark).
 // Lines 9 and 10 reuse the first two colours, dashed.
 const SERIES_LIGHT = ["#257de0", "#f47230", "#00b894", "#f2a600", "#ee7fac", "#008a17", "#6a4ce2", "#ec4647"];
@@ -21,10 +24,10 @@ const SERIES_DARK = ["#338ced", "#e76624", "#00a888", "#d28e05", "#e24d8b", "#0a
 const METRICS = {
   lifts: { label: "Lifts open", unit: "lifts", pctOf: "of all lifts" },
   runs: { label: "Runs open", unit: "runs", pctOf: "of all runs" },
-  depth: { label: "Snow depth", unit: "cm", pctOf: "of that season's maximum" },
-  snow: { label: "New snow", unit: "cm", pctOf: "of that season's snowiest day" },
-  base: { label: "Base temperature (daily mean)", unit: "°C", pctOf: "of that season's range of daily means" },
-  summit: { label: "Summit temperature (daily mean)", unit: "°C", pctOf: "of that season's range of daily means" },
+  depth: { label: "Snow depth", unit: "cm", pctOf: "of the period's maximum" },
+  snow: { label: "New snow", unit: "cm", pctOf: "of the period's snowiest day" },
+  base: { label: "Base temperature (daily mean)", unit: "°C", pctOf: "of the period's range of daily means" },
+  summit: { label: "Summit temperature (daily mean)", unit: "°C", pctOf: "of the period's range of daily means" },
 };
 const SECTIONS = ["overview", "lifts", "runs", "snow", "temps"];
 const SECTION_LABEL = { overview: "Overview", lifts: "Lifts", runs: "Runs", snow: "Snow", temps: "Temperatures" };
@@ -34,28 +37,130 @@ let pendingHistoryCarry = null; // "Go to day" from the compare graph opens the 
 
 // ------------------------------------------------------------------ saved choices
 
-function compareState() {
-  let s;
-  try { s = JSON.parse(localStorage.getItem("compare")) || {}; } catch { s = {}; }
+/** Compare works in seasons and months: a week or day becomes its month. */
+function compareUnitOf(unit, value) {
+  return unit === "week" || unit === "day" ? { unit: "month", value: monthOfPeriod(unit, value) } : { unit, value };
+}
+function compareItemLabel(unit, value) {
+  const c = compareUnitOf(unit, value);
+  return periodLabel(c.unit, c.value);
+}
+
+/** Saved choices: {mode, items: [{id, unit, value}], graph: {metric, pct}, side: {open}}.
+ *  `defaults`: on the very first visit start with two resorts (pinned ones first). */
+function compareState({ defaults = true } = {}) {
+  let raw;
+  try { raw = JSON.parse(localStorage.getItem("compare")); } catch { raw = null; }
+  const s = raw && typeof raw === "object" ? raw : {};
   const ids = resortIds();
   const latest = availableSeasons()[0];
-  const valid = id => ids.includes(id);
-  const firstIds = [...pins.list(), ...ids].filter((v, i, a) => a.indexOf(v) === i).slice(0, 2);
+  if (!Array.isArray(s.items)) {
+    // older format kept graph lines and side-by-side columns apart: merge them into one list
+    s.items = [...(s.side?.columns || []), ...(s.graph?.lines || []).map(l => ({ id: l.id, unit: "season", value: l.season }))];
+    if (!raw && defaults && latest) {
+      s.items = [...pins.list(), ...ids].filter((v, i, a) => a.indexOf(v) === i).slice(0, 2)
+        .map(id => ({ id, unit: "season", value: latest }));
+    }
+  }
+  s.items = s.items
+    .filter(it => it && ids.includes(it.id) && UNITS.includes(it.unit) && it.value)
+    .map(it => ({ id: it.id, ...compareUnitOf(it.unit, it.value) }))
+    .slice(0, MAX_ITEMS);
   s.mode = s.mode === "side" ? "side" : "graph";
-  s.graph = s.graph || {};
-  s.graph.metric = METRICS[s.graph.metric] ? s.graph.metric : "lifts";
-  s.graph.pct = !!s.graph.pct;
-  s.graph.range = s.graph.range || { kind: "season" };
-  s.graph.lines = (s.graph.lines || []).filter(l => valid(l.id) && state.index.seasons[l.season]).slice(0, MAX_LINES);
-  if (!s.graph.lines.length && latest) s.graph.lines = firstIds.map(id => ({ id, season: latest }));
-  s.side = s.side || {};
-  s.side.columns = (s.side.columns || []).filter(c => valid(c.id) && UNITS.includes(c.unit) && c.value).slice(0, MAX_COLUMNS);
-  if (!s.side.columns.length && latest) s.side.columns = firstIds.map(id => ({ id, unit: "season", value: latest }));
-  s.side.open = Array.isArray(s.side.open) ? s.side.open : ["overview", "lifts"];
+  s.graph = { metric: METRICS[s.graph?.metric] ? s.graph.metric : "lifts", pct: !!s.graph?.pct };
+  s.side = { open: Array.isArray(s.side?.open) ? s.side.open : ["overview", "lifts"] };
   return s;
 }
 function saveCompare(s) {
   try { localStorage.setItem("compare", JSON.stringify(s)); } catch { /* ignore */ }
+}
+
+/** Add a resort and period (from a Historical page). Returns "added", "exists" or "full". */
+function addToCompare(id, unit, value) {
+  const s = compareState({ defaults: false });
+  const item = { id, ...compareUnitOf(unit, value) };
+  if (s.items.some(x => x.id === item.id && x.unit === item.unit && x.value === item.value)) return "exists";
+  if (s.items.length >= MAX_ITEMS) return "full";
+  s.items.push(item);
+  saveCompare(s);
+  return "added";
+}
+
+// ------------------------------------------------------------------ "+ Compare": animation and badge
+
+/** How many resorts were added since the Compare tab was last opened (shown on the tab). */
+function compareNewCount() {
+  try { return Number(localStorage.getItem("compareNew")) || 0; } catch { return 0; }
+}
+function setCompareNewCount(n) {
+  try { n ? localStorage.setItem("compareNew", String(n)) : localStorage.removeItem("compareNew"); } catch { /* ignore */ }
+}
+function showCompareBadge(pop = false) {
+  const tab = document.querySelector('.tabs a[data-tab="compare"]');
+  if (!tab) return;
+  const n = compareNewCount();
+  let badge = tab.querySelector(".tab-badge");
+  if (!n) {
+    badge?.remove();
+    tab.removeAttribute("aria-label");
+    return;
+  }
+  if (!badge) {
+    badge = document.createElement("span");
+    badge.className = "tab-badge";
+    badge.setAttribute("aria-hidden", "true");
+    tab.append(badge);
+  }
+  badge.textContent = n > 99 ? "99+" : String(n);
+  tab.setAttribute("aria-label", `Compare (${n} newly added)`);
+  if (pop) {
+    badge.classList.remove("pop");
+    void badge.offsetWidth; // restart the animation
+    badge.classList.add("pop");
+  }
+}
+/** Opening the Compare tab clears the count. */
+function compareSeen() {
+  setCompareNewCount(0);
+  showCompareBadge();
+}
+
+/** The resort's name lifts off the page title and swoops up into the Compare tab. */
+function flyToCompare(fromEl, text, done) {
+  const tab = document.querySelector('.tabs a[data-tab="compare"]');
+  const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  if (!fromEl || !tab || reduce || !Element.prototype.animate) { done(); return; }
+  const from = fromEl.getBoundingClientRect();
+  const ghost = document.createElement("div");
+  ghost.className = "fly-ghost";
+  ghost.textContent = text;
+  ghost.style.left = `${from.left}px`;
+  ghost.style.top = `${from.top}px`;
+  document.body.append(ghost);
+  const g = ghost.getBoundingClientRect(), to = tab.getBoundingClientRect();
+  const dx = to.left + to.width / 2 - (g.left + g.width / 2);
+  const dy = to.top + to.height / 2 - (g.top + g.height / 2);
+  const anim = ghost.animate([
+    { transform: "translate(0, 0) scale(1)", opacity: 1 },
+    { transform: `translate(${dx * 0.15}px, ${dy * 0.55}px) scale(0.8)`, opacity: 1, offset: 0.4 },
+    { transform: `translate(${dx * 0.7}px, ${dy * 1.05}px) scale(0.45)`, opacity: 0.9, offset: 0.8 },
+    { transform: `translate(${dx}px, ${dy}px) scale(0.15)`, opacity: 0 },
+  ], { duration: 800, easing: "cubic-bezier(.45, 0, .25, 1)" });
+  anim.onfinish = anim.oncancel = () => { ghost.remove(); done(); };
+}
+
+function addToCompareWithAnimation(id, unit, value, titleEl, button) {
+  const name = state.index.resorts[id].name;
+  const result = addToCompare(id, unit, value);
+  if (result === "exists") { toast(`${name} (${compareItemLabel(unit, value)}) is already in Compare.`); return; }
+  if (result === "full") { toast(`Compare holds up to ${MAX_ITEMS} resorts. Remove one there first.`); return; }
+  setCompareNewCount(compareNewCount() + 1);
+  if (button) {
+    button.textContent = "✓ Added";
+    button.disabled = true;
+    setTimeout(() => { if (button.isConnected) { button.textContent = "+ Compare"; button.disabled = false; } }, 1600);
+  }
+  flyToCompare(titleEl, name, () => showCompareBadge(true));
 }
 
 function shortName(id) {
@@ -78,10 +183,6 @@ function resortOptions(selected) {
   }
   return html;
 }
-function seasonOptions(selected) {
-  return availableSeasons().map(l => `<option value="${l}"${l === selected ? " selected" : ""}>${seasonShort(l)}${state.index.seasons[l].demo ? " (demo)" : ""}</option>`).join("");
-}
-
 // ------------------------------------------------------------------ graph mode
 
 /** Put a date from any season on a common reference season (2001-02), so seasons line up. */
@@ -104,9 +205,31 @@ function graphRange(range) {
   return [`${months[0]}-01`, monthEnd(months[months.length - 1])];
 }
 
-async function seriesFor(line, metric, pct, i) {
-  const [sStart, sEnd] = periodRange("season", line.season);
-  const recs = await recordsInRange(line.id, sStart, sEnd);
+/** The graph's time range follows the longest period in the list: the whole season if any
+ *  resort is a season, otherwise from the earliest to the latest month (by date in the season). */
+function compareRange(items) {
+  if (!items.length || items.some(it => it.unit === "season")) return { kind: "season" };
+  const months = items.map(it => it.value).sort((a, b) => refDate(`${a}-15`).localeCompare(refDate(`${b}-15`)));
+  return { kind: "months", from: Number(months[0].slice(5)), to: Number(months[months.length - 1].slice(5)) };
+}
+function compareRangeText(items) {
+  const r = compareRange(items);
+  if (r.kind === "season") return "Whole season";
+  const name = n => MONTH_NAMES[n - 1].replace(/^./, c => c.toUpperCase());
+  return r.from === r.to ? name(r.from) : `${name(r.from)} – ${name(r.to)}`;
+}
+
+function monthShort(ym) {
+  const [y, m] = ym.split("-");
+  return `${MONTH_NAMES[Number(m) - 1].slice(0, 3).replace(/^./, c => c.toUpperCase())} ${y.slice(2)}`;
+}
+function itemShort(it) {
+  return it.unit === "season" ? seasonShort(it.value) : monthShort(it.value);
+}
+
+async function seriesFor(it, metric, pct, i) {
+  const [pStart, pEnd] = periodRange(it.unit, it.value);
+  const recs = await recordsInRange(it.id, pStart, pEnd);
   const ok = recs.filter(x => x.r.ok);
   const source = snowSource(recs);
   let value;
@@ -133,9 +256,9 @@ async function seriesFor(line, metric, pct, i) {
     if (v != null) points.push({ date: refDate(x.date), actualDate: x.date, value: Math.round(v * 10) / 10, r: x.r });
   }
   return {
-    key: `${i}`, id: line.id, season: line.season,
-    label: `${state.index.resorts[line.id].name} ${seasonShort(line.season)}`,
-    short: `${shortName(line.id)} ${seasonShort(line.season)}`,
+    key: `${i}`, id: it.id,
+    label: `${state.index.resorts[it.id].name} ${it.unit === "season" ? `season ${it.value}` : periodLabel("month", it.value)}`,
+    short: `${shortName(it.id)} ${itemShort(it)}`,
     color: seriesColor(i), dashed: i >= 8, points,
   };
 }
@@ -160,12 +283,13 @@ async function drawCompareGraph(s) {
   if (!host) return;
   compareGraph?.destroy();
   compareGraph = null;
-  const { metric, pct, range, lines } = s.graph;
+  const { metric, pct } = s.graph;
+  const lines = s.items;
   if (!lines.length) { host.innerHTML = `<p class="muted">Add a resort to start comparing.</p>`; return; }
   host.innerHTML = `<p class="muted small">Loading…</p>`;
   const series = await Promise.all(lines.map((l, i) => seriesFor(l, metric, pct, i)));
   if (!view.querySelector(".cmp-graph")) return; // navigated away
-  const [start, end] = graphRange(range);
+  const [start, end] = graphRange(compareRange(lines));
   const m = METRICS[metric];
   host.innerHTML = `<p class="muted small graph-caption">${esc(m.label)}${pct ? ` as a percentage ${esc(m.pctOf)}` : ""}.
     Seasons are lined up by date. Hover or click for each line's value; "Go to day" opens that resort's day.</p><div class="graph-host"></div>`;
@@ -184,9 +308,7 @@ async function drawCompareGraph(s) {
 
 function graphModeHtml(s) {
   const g = s.graph;
-  const months = seasonMonths("2001-02").map(ym => Number(ym.slice(5)));
-  const monthName = n => MONTH_NAMES[n - 1].replace(/^./, c => c.toUpperCase());
-  const monthOpts = sel => months.map(n => `<option value="${n}"${Number(sel) === n ? " selected" : ""}>${monthName(n)}</option>`).join("");
+  const anySeason = s.items.some(it => it.unit === "season");
   return `
     <div class="cmp-controls">
       <label class="cmp-field">Data point
@@ -195,27 +317,64 @@ function graphModeHtml(s) {
       <label class="cmp-check"><input type="checkbox" data-g="pct"${g.pct ? " checked" : ""}> As a percentage
         <span class="muted small">(${esc(METRICS[g.metric].pctOf)})</span></label>
       <div class="cmp-field">Time range
-        <div class="cmp-range">
-          <select data-g="range-kind">
-            <option value="season"${g.range.kind === "season" ? " selected" : ""}>Whole season</option>
-            <option value="months"${g.range.kind === "months" ? " selected" : ""}>From month to month</option>
-          </select>
-          ${g.range.kind === "months" ? `<select data-g="from" aria-label="From">${monthOpts(g.range.from || months[1])}</select>
-            <span class="muted">to</span><select data-g="to" aria-label="To">${monthOpts(g.range.to || months[2])}</select>` : ""}
-        </div>
+        <div class="cmp-range"><strong>${esc(compareRangeText(s.items))}</strong>
+          <span class="muted small">${s.items.length ? (anySeason ? "(a resort below is a whole season)" : "(the months chosen below)") : ""}</span></div>
       </div>
     </div>
     <div class="cmp-lines">
-      ${g.lines.map((l, i) => `
-        <div class="cmp-line" data-i="${i}">
+      ${s.items.map((it, i) => `
+        <div class="cmp-line" data-item="${i}">
           ${lineKey({ color: seriesColor(i), dashed: i >= 8 })}
-          <select data-line="id" aria-label="Resort">${resortOptions(l.id)}</select>
-          <select data-line="season" aria-label="Season">${seasonOptions(l.season)}</select>
-          <button type="button" class="link-button" data-remove-line="${i}" aria-label="Remove">✕</button>
+          ${resortSelectHtml(it)}${periodControlsHtml(it)}${removeButton(i)}
         </div>`).join("")}
-      ${g.lines.length < MAX_LINES ? `<button type="button" class="button button-secondary" data-add-line>+ Add resort</button>` : `<span class="muted small">Up to ${MAX_LINES} lines.</span>`}
+      ${addItemButton(s)}
     </div>
     <div class="cmp-graph card"></div>`;
+}
+
+// ------------------------------------------------------------------ the shared list of resorts
+
+/** The controls for one item, the same in both modes: resort, then Season/Month and the
+ *  period picker. */
+function resortSelectHtml(it) {
+  return `<select data-item-id aria-label="Resort">${resortOptions(it.id)}</select>`;
+}
+function periodControlsHtml(it) {
+  return `<select data-item-unit aria-label="Season or month">${COMPARE_UNITS.map(u =>
+      `<option value="${u}"${u === it.unit ? " selected" : ""}>${UNIT_LABEL[u]}</option>`).join("")}</select>
+    ${pickerHtml(it.unit, it.value)}`;
+}
+function removeButton(i) {
+  return `<button type="button" class="link-button" data-remove-item="${i}" aria-label="Remove">✕</button>`;
+}
+function wireItemControls(s, save) {
+  view.querySelectorAll("[data-item]").forEach(el => {
+    const it = s.items[Number(el.dataset.item)];
+    el.querySelector("[data-item-id]").addEventListener("change", e => { it.id = e.target.value; save(); });
+    el.querySelector("[data-item-unit]").addEventListener("change", e => {
+      it.value = switchUnit(it.unit, it.value, e.target.value);
+      it.unit = e.target.value;
+      save();
+    });
+    setupPicker(el.querySelector(".picker"), it.unit, it.value, v => { it.value = v; save(); });
+  });
+  view.querySelectorAll("[data-remove-item]").forEach(b => b.addEventListener("click", () => {
+    s.items.splice(Number(b.dataset.removeItem), 1);
+    save();
+  }));
+  view.querySelector("[data-add-item]")?.addEventListener("click", () => {
+    // same period as the last one, with the next resort not already shown for it
+    const last = s.items[s.items.length - 1];
+    const unit = last?.unit || "season", value = last?.value || availableSeasons()[0];
+    const used = new Set(s.items.filter(x => x.unit === unit && x.value === value).map(x => x.id));
+    s.items.push({ id: resortIds().find(id => !used.has(id)) || resortIds()[0], unit, value });
+    save();
+  });
+}
+function addItemButton(s, extraClass = "") {
+  return s.items.length < MAX_ITEMS
+    ? `<button type="button" class="button button-secondary ${extraClass}" data-add-item>+ Add resort</button>`
+    : `<span class="muted small">Up to ${MAX_ITEMS} resorts.</span>`;
 }
 
 // ------------------------------------------------------------------ side-by-side mode
@@ -307,48 +466,30 @@ function sectionCell(key, d) {
   return `<dl class="cmp-dl">${rows.join("")}</dl>`;
 }
 
-function columnHead(c, i) {
+function columnHead(it, i) {
   return `
-    <div class="cmp-col-head" data-col="${i}">
-      <div class="cmp-col-top">
-        <select data-col-id aria-label="Resort">${resortOptions(c.id)}</select>
-        <button type="button" class="link-button" data-remove-col="${i}" aria-label="Remove">✕</button>
-      </div>
-      <select data-col-unit aria-label="View by">${UNITS.map(u => `<option value="${u}"${u === c.unit ? " selected" : ""}>${UNIT_LABEL[u]}</option>`).join("")}</select>
-      <div class="picker">
-        <button type="button" class="pk-arrow" data-dir="-1" aria-label="Previous">‹</button>
-        <button type="button" class="pk-field" aria-haspopup="dialog" aria-expanded="false"><span>${esc(periodLabel(c.unit, c.value))}</span></button>
-        <button type="button" class="pk-arrow" data-dir="1" aria-label="Next">›</button>
-        <div class="pk-pop" hidden role="dialog" aria-label="Choose a ${c.unit}">
-          <input type="search" class="pk-search" placeholder="Search" autocomplete="off">
-          <div class="pk-body"></div>
-        </div>
-      </div>
-      <a class="small" href="#/history/${esc(c.id)}/${c.unit}/${c.value}">Open in Historical ›</a>
+    <div class="cmp-col-head" data-item="${i}">
+      <div class="cmp-col-top">${lineKey({ color: seriesColor(i), dashed: i >= 8 })}${resortSelectHtml(it)}${removeButton(i)}</div>
+      ${periodControlsHtml(it)}
+      <a class="small" href="#/history/${esc(it.id)}/${it.unit}/${it.value}">Open in Historical ›</a>
     </div>`;
 }
 
 async function sideModeHtml(s) {
-  const cols = s.side.columns;
-  if (!cols.length) return `<p class="muted">Add a resort to start comparing.</p>${addColumnButton(s)}`;
-  const data = await Promise.all(cols.map(columnData));
-  const style = `style="--cols:${cols.length}"`;
+  const items = s.items;
+  if (!items.length) return `<p class="muted">Add a resort to start comparing.</p>${addItemButton(s, "cmp-add")}`;
+  const data = await Promise.all(items.map(columnData));
+  const style = `style="--cols:${items.length}"`;
   return `
     <div class="cmp-side-scroll">
-      <div class="cmp-grid cmp-heads" ${style}>${cols.map(columnHead).join("")}</div>
+      <div class="cmp-grid cmp-heads" ${style}>${items.map(columnHead).join("")}</div>
       ${SECTIONS.map(key => `
         <details class="cmp-section" data-section="${key}"${s.side.open.includes(key) ? " open" : ""}>
           <summary>${SECTION_LABEL[key]}</summary>
           <div class="cmp-grid" ${style}>${data.map(d => `<div class="cmp-cell">${sectionCell(key, d)}</div>`).join("")}</div>
         </details>`).join("")}
     </div>
-    ${addColumnButton(s)}`;
-}
-
-function addColumnButton(s) {
-  return s.side.columns.length < MAX_COLUMNS
-    ? `<button type="button" class="button button-secondary cmp-add" data-add-col>+ Add resort</button>`
-    : `<p class="muted small">Up to ${MAX_COLUMNS} resorts side by side.</p>`;
+    ${addItemButton(s, "cmp-add")}`;
 }
 
 // ------------------------------------------------------------------ page
@@ -357,13 +498,15 @@ async function renderCompare() {
   compareGraph?.destroy();
   compareGraph = null;
   const s = compareState();
+  saveCompare(s); // keep the first visit's starting resorts
   const head = `
     ${IS_DEMO ? `<div class="demo-banner">Demo mode: season 2025-26 is made-up data for testing.</div>` : ""}
     <h1 class="page-title">Compare</h1>
     <div class="seg cmp-mode" role="radiogroup" aria-label="Mode">
       <button type="button" role="radio" class="seg-btn${s.mode === "graph" ? " is-active" : ""}" aria-checked="${s.mode === "graph"}" data-mode="graph">Graph</button>
       <button type="button" role="radio" class="seg-btn${s.mode === "side" ? " is-active" : ""}" aria-checked="${s.mode === "side"}" data-mode="side">Side by side</button>
-    </div>`;
+    </div>
+    <p class="muted small cmp-sync-note">Both views show the same resorts. Add more here, or with “+ Compare” on a resort's Historical page.</p>`;
   if (s.mode === "graph") {
     view.innerHTML = head + graphModeHtml(s);
   } else {
@@ -375,50 +518,13 @@ async function renderCompare() {
   const save = () => { saveCompare(s); renderCompare(); };
 
   view.querySelectorAll("[data-mode]").forEach(b => b.addEventListener("click", () => { s.mode = b.dataset.mode; save(); }));
+  wireItemControls(s, save);
 
   if (s.mode === "graph") {
-    const g = s.graph;
-    view.querySelector('[data-g="metric"]').addEventListener("change", e => { g.metric = e.target.value; save(); });
-    view.querySelector('[data-g="pct"]').addEventListener("change", e => { g.pct = e.target.checked; save(); });
-    view.querySelector('[data-g="range-kind"]').addEventListener("change", e => {
-      const months = seasonMonths("2001-02").map(ym => Number(ym.slice(5)));
-      g.range = e.target.value === "months" ? { kind: "months", from: months[1], to: months[2] } : { kind: "season" };
-      save();
-    });
-    view.querySelector('[data-g="from"]')?.addEventListener("change", e => { g.range.from = Number(e.target.value); save(); });
-    view.querySelector('[data-g="to"]')?.addEventListener("change", e => { g.range.to = Number(e.target.value); save(); });
-    view.querySelectorAll(".cmp-line").forEach(row => {
-      const i = Number(row.dataset.i);
-      row.querySelector('[data-line="id"]').addEventListener("change", e => { g.lines[i].id = e.target.value; save(); });
-      row.querySelector('[data-line="season"]').addEventListener("change", e => { g.lines[i].season = e.target.value; save(); });
-    });
-    view.querySelectorAll("[data-remove-line]").forEach(b => b.addEventListener("click", () => { g.lines.splice(Number(b.dataset.removeLine), 1); save(); }));
-    view.querySelector("[data-add-line]")?.addEventListener("click", () => {
-      const last = g.lines[g.lines.length - 1];
-      g.lines.push({ id: last?.id || resortIds()[0], season: availableSeasons().find(l => l !== last?.season) || availableSeasons()[0] });
-      save();
-    });
+    view.querySelector('[data-g="metric"]').addEventListener("change", e => { s.graph.metric = e.target.value; save(); });
+    view.querySelector('[data-g="pct"]').addEventListener("change", e => { s.graph.pct = e.target.checked; save(); });
     drawCompareGraph(s);
   } else {
-    const cols = s.side.columns;
-    view.querySelectorAll(".cmp-col-head").forEach(headEl => {
-      const i = Number(headEl.dataset.col);
-      headEl.querySelector("[data-col-id]").addEventListener("change", e => { cols[i].id = e.target.value; save(); });
-      headEl.querySelector("[data-col-unit]").addEventListener("change", e => {
-        const [start, end] = periodRange(cols[i].unit, cols[i].value);
-        const anchor = todayIso() >= start && todayIso() <= end ? todayIso() : start;
-        cols[i].unit = e.target.value;
-        cols[i].value = unitContaining(cols[i].unit, anchor);
-        save();
-      });
-      setupPicker(headEl.querySelector(".picker"), cols[i].unit, cols[i].value, v => { cols[i].value = v; save(); });
-    });
-    view.querySelectorAll("[data-remove-col]").forEach(b => b.addEventListener("click", () => { cols.splice(Number(b.dataset.removeCol), 1); save(); }));
-    view.querySelector("[data-add-col]")?.addEventListener("click", () => {
-      const last = cols[cols.length - 1];
-      cols.push(last ? { ...last } : { id: resortIds()[0], unit: "season", value: availableSeasons()[0] });
-      save();
-    });
     // one section opens/closes for every column; remember which are open
     view.querySelectorAll(".cmp-section").forEach(d => d.addEventListener("toggle", () => {
       const open = new Set(s.side.open);

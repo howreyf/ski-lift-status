@@ -400,49 +400,180 @@ function gradeOf(level) {
   return GRADES.find(g => g.levels.includes(level)) || GRADES[GRADES.length - 1];
 }
 
-// ------------------------------------------------------------------ Historical tab: directory and search
+// ------------------------------------------------------------------ Historical tab: period table
 
-/** Season averages for the search: last season if we have it, otherwise this season so far. */
-function lastSeasonSummary(id) {
-  const latest = availableSeasons()[0];
-  if (!latest) return null;
-  const prev = seasonLabel(seasonStartYear(latest) - 1);
-  const p = state.index.seasons[prev]?.summary?.[id];
-  if (p) return { label: prev, s: p, soFar: false };
-  return { label: latest, s: state.index.seasons[latest]?.summary?.[id] || {}, soFar: true };
+const DIRECTORY_UNITS = ["season", "month"]; // the Historical tab itself: seasons and months only
+
+/** The week or day's month (a week counts as the month most of its days are in). */
+function monthOfPeriod(unit, value) {
+  return (unit === "week" ? addDaysIso(value, 3) : value).slice(0, 7);
 }
+
+/** The period chosen at the top of the Historical tab: the most recent season or month the
+ *  visitor chose anywhere in Historical (a week or day counts as its month). First visit:
+ *  the latest season. */
+function historyPeriod() {
+  let p;
+  try { p = JSON.parse(localStorage.getItem("historyPeriod")); } catch { p = null; }
+  const known = p && ((p.unit === "season" && state.index.seasons[p.value]) ||
+    (p.unit === "month" && /^\d{4}-\d{2}$/.test(p.value) && inSeasonMonth(p.value)));
+  return known ? p : { unit: "season", value: availableSeasons()[0] || seasonOf(todayIso()) };
+}
+function rememberHistoryPeriod(unit, value) {
+  if (unit === "week" || unit === "day") { value = monthOfPeriod(unit, value); unit = "month"; }
+  try { localStorage.setItem("historyPeriod", JSON.stringify({ unit, value })); } catch { /* ignore */ }
+}
+function historyHref(id) {
+  const p = historyPeriod();
+  return `#/history/${id}/${p.unit}/${p.value}`;
+}
+
+/** Season / Month / Week / Day buttons. */
+function segHtml(units, unit) {
+  return `<div class="seg" role="radiogroup" aria-label="View by">
+    ${units.map(u => `<button type="button" role="radio" aria-checked="${u === unit}" class="seg-btn${u === unit ? " is-active" : ""}" data-unit="${u}">${UNIT_LABEL[u]}</button>`).join("")}
+  </div>`;
+}
+
+/** The period field with ‹ › arrows and its dropdown calendar (wired up by setupPicker). */
+function pickerHtml(unit, value) {
+  return `
+    <div class="picker">
+      <button type="button" class="pk-arrow" data-dir="-1" aria-label="Previous ${unit}">‹</button>
+      <button type="button" class="pk-field" aria-haspopup="dialog" aria-expanded="false">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="2"/></svg>
+        <span>${esc(periodLabel(unit, value))}</span>
+      </button>
+      <button type="button" class="pk-arrow" data-dir="1" aria-label="Next ${unit}">›</button>
+      <div class="pk-pop" hidden role="dialog" aria-label="Choose a ${unit}">
+        <input type="search" class="pk-search" placeholder="Search, e.g. ${unit === "season" ? "26-27 or 2027" : unit === "month" ? "Dec 2026" : "30/12/26"}" autocomplete="off">
+        <div class="pk-body"></div>
+      </div>
+    </div>`;
+}
+
+/** Switching unit keeps roughly the same time: a month's season, or for a season: this
+ *  month if it's in it, otherwise its last month with data, otherwise its first month. */
+function switchUnit(unit, value, toUnit) {
+  const [start, end] = periodRange(unit, value);
+  if (toUnit === "season") return seasonOf(start);
+  const today = todayIso();
+  const dates = [...datesWithData()].filter(d => d >= start && d <= end).sort();
+  const anchor = today >= start && today <= end ? today : dates[dates.length - 1] || start;
+  return unitContaining(toUnit, anchor);
+}
+
+/** One resort over a period: the day with the most lifts / runs open, and mean base
+ *  temperature and snow depth (season means use Dec-Apr like the resort pages, or every
+ *  recorded day while the season has no Dec-Apr days yet). */
+async function periodStatsFor(id, unit, value) {
+  const [start, end] = periodRange(unit, value);
+  const recs = await recordsInRange(id, start, end);
+  const ok = recs.filter(x => x.r.ok);
+  const most = (list, key) => list.reduce((best, x) => (best && best.r[key] >= x.r[key] ? best : x), null);
+  const forMean = list => { const m = meanRecords(list, unit); return m.length ? m : list; };
+  const temps = forMean(recs.filter(x => x.r.temps?.kind === "final" && x.r.temps.base?.mean_c != null)).map(x => x.r.temps.base.mean_c);
+  const depths = forMean(ok.filter(x => x.r.snow_depth_cm != null)).map(x => x.r.snow_depth_cm);
+  return {
+    days: recs.length,
+    lifts: most(ok, "lifts_open"),
+    runs: most(ok.filter(x => x.r.runs?.length), "runs_open"),
+    base: mean(temps),
+    depth: mean(depths),
+  };
+}
+
+const historyDir = { unit: null, value: null, stats: {} };
+let historyDirToken = 0;
 
 function historyCells(id, recentlyViewed = false) {
   const info = state.index.resorts[id];
-  const r = todayResult(id);
-  const lifts = r?.lifts || [];
-  const ls = lastSeasonSummary(id);
-  const note = ls ? `<span class="cell-note">${ls.soFar ? `${esc(ls.label)} so far` : `season ${esc(ls.label)}`}</span>` : "";
+  const s = historyDir.stats[id] || {};
+  const on = (x, n) => n ? `<span class="cell-note">on ${esc(shortDay(x.date))}</span>` : "";
+  const start = historyDir.unit ? periodRange(historyDir.unit, historyDir.value)[0] : state.latestDate;
   return `
-    <span class="cell cell-name">${recentlyViewed ? HISTORY_ICON : ""}${esc(info.name)}${nightIcon(nightSkiing(id, state.latestDate))}<span class="cell-note">${esc(info.region)}</span></span>
-    <span class="cell" data-label="Total lifts">${lifts.length ? `<strong>${lifts.length}</strong> lifts` : NA}</span>
-    <span class="cell" data-label="Total runs">${runGradeTotalsHtml(r?.runs)}</span>
-    <span class="cell" data-label="Mean base temp">${ls?.s?.base_mean_c != null ? `${deg(ls.s.base_mean_c)} °C` : NA}${note}</span>
-    <span class="cell" data-label="Mean snow depth">${ls?.s?.snow_depth_mean_cm != null ? `${ls.s.snow_depth_mean_cm} cm` : NA}${note}</span>`;
+    <span class="cell cell-name">${recentlyViewed ? HISTORY_ICON : ""}${esc(info.name)}${nightIcon(nightSkiing(id, start))}<span class="cell-note">${esc(info.region)}</span></span>
+    <span class="cell" data-label="Most lifts open">${s.lifts
+      ? `<strong>${s.lifts.r.lifts_open}</strong> / ${s.lifts.r.lifts.length}${on(s.lifts, s.lifts.r.lifts_open)}` : NA}</span>
+    <span class="cell" data-label="Most runs open">${s.runs
+      ? `${runsHtml({ ok: true, runs: s.runs.r.runs })}${on(s.runs, s.runs.r.runs_open)}` : NA}</span>
+    <span class="cell" data-label="Mean base temp">${s.base != null ? `${deg(s.base)} °C` : NA}</span>
+    <span class="cell" data-label="Mean snow depth">${s.depth != null ? `${Math.round(s.depth)} cm` : NA}</span>`;
 }
 
-const HISTORY_SEARCH = { cells: historyCells, href: id => `#/history/${id}` };
+const HISTORY_SEARCH = { cells: historyCells, href: historyHref };
 
-function renderHistoryDirectory() {
+const HISTORY_TABLE_HEAD = `
+  <div class="table-head" aria-hidden="true">
+    <span>Resort</span><span>Most lifts open</span><span>Most runs open</span><span>Mean base temp</span><span>Mean snow depth</span><span></span>
+  </div>`;
+
+function historyRow(id) {
+  const pinned = pins.has(id);
+  const name = state.index.resorts[id].name;
+  return `
+    <div class="resort-row">
+      <a class="resort-link" href="${esc(historyHref(id))}">${historyCells(id)}</a>
+      <button class="pin${pinned ? " is-pinned" : ""}" type="button" data-pin="${esc(id)}"
+        aria-pressed="${pinned}" title="${pinned ? "Unpin" : "Pin"} ${esc(name)}"
+        aria-label="${pinned ? "Unpin" : "Pin"} ${esc(name)}">${pinIcon(pinned)}</button>
+    </div>`;
+}
+
+async function renderHistoryDirectory() {
+  const { unit, value } = historyPeriod();
+  const token = ++historyDirToken;
+  const ids = resortIds();
+  const stats = await Promise.all(ids.map(id => periodStatsFor(id, unit, value)));
+  if (token !== historyDirToken || !/^#\/history\/?$/.test(location.hash)) return; // changed again, or navigated away
+  Object.assign(historyDir, { unit, value, stats: Object.fromEntries(ids.map((id, i) => [id, stats[i]])) });
+
+  const pinned = pins.list();
+  const closed = closedRegions();
+  const anyData = stats.some(s => s.days);
   let html = `
     <h1 class="page-title">Historical</h1>
-    <p class="muted small">Past seasons, months, weeks and days for each resort. The search shows season totals and averages.</p>
+    <div class="period" aria-label="Choose a period">${segHtml(DIRECTORY_UNITS, unit)}${pickerHtml(unit, value)}</div>
+    <p class="muted small">Every resort over this ${unitWord(unit)}. Pick a resort for its full history, down to single weeks and days.</p>
     ${searchHtml()}
-    <div class="directory">`;
-  for (const [region, ids] of regions()) {
+    ${anyData ? "" : `<p class="warn">Nothing was recorded in ${esc(periodLabel(unit, value))}.</p>`}
+    <div class="resort-table">
+      ${HISTORY_TABLE_HEAD}`;
+  if (pinned.length) {
     html += `
-      <section class="directory-region">
-        <h2>${esc(region)}</h2>
-        <ul>${ids.map(id => `<li><a href="#/history/${esc(id)}">${esc(state.index.resorts[id].name)}</a>${nightIcon(nightSkiing(id, state.latestDate))}</li>`).join("")}</ul>
+      <section class="group group-pinned">
+        <h2 class="group-title">${pinIcon(true)} Pinned <span class="count">${pinned.length} / ${MAX_PINS}</span></h2>
+        ${pinned.map(historyRow).join("")}
       </section>`;
   }
-  view.innerHTML = html + "</div>";
+  for (const [region, regionIds] of regions()) {
+    html += `
+      <details class="group region" data-region="${esc(region)}"${closed.includes(region) ? "" : " open"}>
+        <summary class="group-title">${esc(region)} <span class="count">${regionIds.length}</span></summary>
+        ${regionIds.map(historyRow).join("")}
+      </details>`;
+  }
+  html += `</div>
+    <p class="muted small legend">Most lifts / runs open: the best day of the ${unitWord(unit)} (date underneath).
+      Runs by grade: <span class="grade grade-green"></span> green <span class="grade grade-red"></span> red
+      <span class="grade grade-black"></span> black <span class="grade grade-orange"></span> expert
+      <span class="grade grade-other"></span> level not published.
+      Means: base temperature (from the daily means) and snow depth${unit === "season" ? `, over ${meanMonthsLabel()} (every recorded day until the season reaches ${meanMonthsLabel().slice(0, 3)})` : ""}.</p>`;
+  view.innerHTML = html;
+
+  const pick = (u, v) => { rememberHistoryPeriod(u, v); renderHistoryDirectory(); };
+  view.querySelectorAll(".seg-btn[data-unit]").forEach(b => b.addEventListener("click", () => {
+    if (b.dataset.unit !== unit) pick(b.dataset.unit, switchUnit(unit, value, b.dataset.unit));
+  }));
+  setupPicker(view.querySelector(".picker"), unit, value, v => pick(unit, v));
   setupSearch(view, HISTORY_SEARCH);
+  view.querySelectorAll("button[data-pin]").forEach(btn => btn.addEventListener("click", () => {
+    if (pins.toggle(btn.dataset.pin)) renderHistoryDirectory();
+  }));
+  view.querySelectorAll("details.region").forEach(d => d.addEventListener("toggle", () => {
+    const list = closedRegions().filter(r => r !== d.dataset.region);
+    writeList("closedRegions", d.open ? list : [...list, d.dataset.region]);
+  }));
 }
 
 // ------------------------------------------------------------------ period statistics
@@ -895,6 +1026,7 @@ async function renderHistoryPage(id, unit, value, carry = null) {
   }
   recent.add(id);
   saveHistoryView(id, unit, value);
+  rememberHistoryPeriod(unit, value);
   const prev = historyUI?.id === id ? historyUI : null;
   historyUI?.graph?.destroy();
   let expanded = carry?.expanded ?? prev?.expanded ?? null;
@@ -938,27 +1070,13 @@ async function renderHistoryPage(id, unit, value, carry = null) {
         </p>
       </div>
       <div class="head-buttons">
+        <button type="button" class="button button-secondary" data-compare
+          title="Add ${esc(info.name)} (${esc(compareItemLabel(unit, value))}) to Compare">+ Compare</button>
         <a class="button button-secondary" href="#/resort/${esc(id)}">Switch to present</a>
       </div>
     </div>
 
-    <div class="period" aria-label="Choose a period">
-      <div class="seg" role="radiogroup" aria-label="View by">
-        ${UNITS.map(u => `<button type="button" role="radio" aria-checked="${u === unit}" class="seg-btn${u === unit ? " is-active" : ""}" data-unit="${u}">${UNIT_LABEL[u]}</button>`).join("")}
-      </div>
-      <div class="picker">
-        <button type="button" class="pk-arrow" data-dir="-1" aria-label="Previous ${unit}">‹</button>
-        <button type="button" class="pk-field" aria-haspopup="dialog" aria-expanded="false">
-          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="2"/></svg>
-          <span>${esc(periodLabel(unit, value))}</span>
-        </button>
-        <button type="button" class="pk-arrow" data-dir="1" aria-label="Next ${unit}">›</button>
-        <div class="pk-pop" hidden role="dialog" aria-label="Choose a ${unit}">
-          <input type="search" class="pk-search" placeholder="Search, e.g. ${unit === "season" ? "26-27 or 2027" : unit === "month" ? "Dec 2026" : "30/12/26"}" autocomplete="off">
-          <div class="pk-body"></div>
-        </div>
-      </div>
-    </div>
+    <div class="period" aria-label="Choose a period">${segHtml(UNITS, unit)}${pickerHtml(unit, value)}</div>
 
     ${factsHtml(facts)}
     ${content}`;
@@ -970,6 +1088,8 @@ async function renderHistoryPage(id, unit, value, carry = null) {
     goHistory(id, b.dataset.unit, unitContaining(b.dataset.unit, anchor));
   }));
   setupPicker(view.querySelector(".picker"), unit, value, v => goHistory(id, unit, v));
+  view.querySelector("[data-compare]").addEventListener("click", e =>
+    addToCompareWithAnimation(id, unit, value, view.querySelector(".page-title"), e.currentTarget));
 
   // boxes: expand / collapse
   view.querySelectorAll(".box-clickable[data-box]").forEach(el => {
