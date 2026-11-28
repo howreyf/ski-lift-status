@@ -134,7 +134,9 @@ def main(argv: list[str]) -> int:
         print(f"Closing issue #{number} ({key}): working again")
         _gh("issue", "close", str(number), "--comment",
             f"Working again (checked {_jst(report['time'])}). Closed automatically.")
-    if not create and not close:
+    if not report["problems"] and not close:
+        print("No problems.")
+    elif not create and not close:
         print(f"No change: {len(report['problems'])} problem(s), all already have an open issue.")
     return 0
 
