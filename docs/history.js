@@ -474,8 +474,13 @@ async function periodStatsFor(id, unit, value) {
   const forMean = list => { const m = meanRecords(list, unit); return m.length ? m : list; };
   const temps = forMean(recs.filter(x => x.r.temps?.kind === "final" && x.r.temps.base?.mean_c != null)).map(x => x.r.temps.base.mean_c);
   const depths = forMean(ok.filter(x => x.r.snow_depth_cm != null)).map(x => x.r.snow_depth_cm);
+  const source = snowSource(recs);
+  const amounts = recs.map(x => snowAmount(x.r, source)).filter(v => v != null);
   return {
     days: recs.length,
+    facts: unit === "season" ? await seasonFacts(id, value) : null,
+    snowTotal: amounts.length ? Math.round(amounts.reduce((a, b) => a + b, 0)) : null,
+    snowSource: source,
     lifts: most(ok, "lifts_open"),
     runs: most(ok.filter(x => x.r.runs?.length), "runs_open"),
     base: mean(temps),
@@ -520,6 +525,77 @@ function historyRow(id) {
     </div>`;
 }
 
+/** The resort(s) with the best value: `better(a, b)` is true when a beats b. Ties are kept. */
+function leaders(valueOf, better) {
+  let best = null, ids = [];
+  for (const id of resortIds()) {
+    const v = valueOf(id);
+    if (v == null) continue;
+    if (best == null || better(v, best)) { best = v; ids = [id]; } else if (v === best) ids.push(id);
+  }
+  return best == null ? null : { value: best, ids };
+}
+
+/** "Niseko", "Niseko and Kiroro" or "Niseko and 3 others" (all names in the tooltip). */
+function leaderNames(ids) {
+  const names = ids.map(id => state.index.resorts[id].name);
+  if (names.length <= 2) return `<strong>${names.map(esc).join("</strong> and <strong>")}</strong>`;
+  return `<strong title="${esc(names.join(", "))}">${esc(names[0])}</strong> and ${names.length - 1} others`;
+}
+
+/** One highlight box; clicking it opens the (first) leading resort at this period. */
+function highlightBox(label, lead, valueHtml, note, emptyValue, emptyNote) {
+  const body = lead
+    ? `<div class="box-value">${valueHtml}</div><div class="box-note">${leaderNames(lead.ids)}${note ? ` · ${note}` : ""}</div>`
+    : `<div class="box-value hl-empty">${emptyValue}</div><div class="box-note">${emptyNote}</div>`;
+  const inner = `<div class="box-body"><div class="box-label">${label}</div>${body}</div>`;
+  return lead
+    ? `<a class="box box-clickable hl-box" href="${esc(historyHref(lead.ids[0]))}">${inner}</a>`
+    : `<div class="box hl-box">${inner}</div>`;
+}
+
+/** Highlights across all resorts for the chosen season or month. */
+function highlightBoxes(unit, value) {
+  const st = id => historyDir.stats[id] || {};
+  const day = iso => esc(shortDay(iso));
+  const onDay = (lead, x) => lead && lead.ids.length === 1 ? `on ${day(x(lead.ids[0]).date)}` : "";
+  const mostRuns = leaders(id => st(id).runs?.r.runs_open || null, (a, b) => a > b);
+  const mostRunsBox = highlightBox("Most runs open", mostRuns,
+    mostRuns && `${mostRuns.value} <small>runs</small>`, onDay(mostRuns, id => st(id).runs),
+    NA, "No runs open yet");
+
+  if (unit === "season") {
+    const earliestOpen = leaders(id => st(id).facts?.open, (a, b) => a < b);
+    const earliestSnow = leaders(id => st(id).facts?.firstSnow, (a, b) => a < b);
+    const latestClose = leaders(id => st(id).facts?.close, (a, b) => a > b);
+    const over = Object.values(historyDir.stats).some(s => s.facts?.over);
+    // the first day of records: an "earliest" on that day may really have been earlier
+    const [sStart, sEnd] = periodRange("season", value);
+    const firstRecord = [...datesWithData()].filter(d => d >= sStart && d <= sEnd).sort()[0];
+    const orEarlier = (lead, what) => lead?.value === firstRecord
+      ? `first day recorded, so it may have ${what} earlier` : null;
+    return [
+      highlightBox("Earliest opening", earliestOpen, earliestOpen && day(earliestOpen.value),
+        orEarlier(earliestOpen, "opened") || "first day runs were open", "Not yet", "No resort has opened yet"),
+      highlightBox("Earliest snow", earliestSnow, earliestSnow && day(earliestSnow.value),
+        orEarlier(earliestSnow, "snowed") || "first day it snowed", "Not yet", "No snow recorded yet"),
+      highlightBox("Latest closing", latestClose, latestClose && day(latestClose.value),
+        "last day runs were open", over ? NA : "Season on",
+        over ? "No closing days recorded" : `Known once the season ends (${esc(shortDay(periodRange("season", value)[1]))})`),
+      mostRunsBox,
+    ].join("");
+  }
+  const mostSnow = leaders(id => st(id).snowTotal || null, (a, b) => a > b);
+  const mostLifts = leaders(id => st(id).lifts?.r.lifts_open || null, (a, b) => a > b);
+  return [
+    highlightBox("Most new snow", mostSnow, mostSnow && `${mostSnow.value} <small>cm</small>`,
+      "total this month", "0 cm", "No new snow recorded"),
+    highlightBox("Most lifts open", mostLifts, mostLifts && `${mostLifts.value} <small>lifts</small>`,
+      onDay(mostLifts, id => st(id).lifts), NA, "No lifts open"),
+    mostRunsBox,
+  ].join("");
+}
+
 async function renderHistoryDirectory() {
   const { unit, value } = historyPeriod();
   const token = ++historyDirToken;
@@ -535,6 +611,7 @@ async function renderHistoryDirectory() {
     <h1 class="page-title">Historical</h1>
     <div class="period" aria-label="Choose a period">${segHtml(DIRECTORY_UNITS, unit)}${pickerHtml(unit, value)}</div>
     <p class="muted small">Every resort over this ${unitWord(unit)}. Pick a resort for its full history, down to single weeks and days.</p>
+    ${anyData ? `<div class="hl-boxes">${highlightBoxes(unit, value)}</div>` : ""}
     ${searchHtml()}
     ${anyData ? "" : `<p class="warn">Nothing was recorded in ${esc(periodLabel(unit, value))}.</p>`}
     <div class="resort-table">
