@@ -543,7 +543,6 @@ function renderHome() {
   view.innerHTML = `
     <section class="hero">
       <h1 class="hero-title">Ski Status</h1>
-      <p class="hero-sub">Lifts, runs and snow at ${resortIds().length} ski resorts in Japan</p>
       <a class="button hero-button" href="#/resorts">Find resorts</a>
     </section>
     <section class="home-pinned" aria-labelledby="pinned-title">
