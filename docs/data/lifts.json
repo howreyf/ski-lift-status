@@ -1,6 +1,6 @@
 {
- "last_updated": "2026-11-28T08:03:54+00:00",
- "last_checked": "2026-11-28T08:03:54+00:00",
+ "last_updated": "2026-11-28T08:33:25+00:00",
+ "last_checked": "2026-11-28T08:33:25+00:00",
  "resorts": {
   "niseko-hirafu": {
    "name": "Niseko Grand Hirafu",
@@ -940,6 +940,90 @@
      "new_snow_max_cm": null,
      "new_snow_mean_cm": null,
      "days_recorded": 1
+    },
+    "breuil-cervinia": {
+     "lifts_total": 15,
+     "runs_total": 35,
+     "snow_depth_max_cm": 130,
+     "snow_depth_max_date": "2026-11-28",
+     "summit_min_c": null,
+     "summit_max_c": null,
+     "summit_lowest_mean_c": null,
+     "summit_highest_mean_c": null,
+     "base_min_c": null,
+     "base_max_c": null,
+     "base_lowest_mean_c": null,
+     "base_highest_mean_c": null,
+     "summit_mean_c": null,
+     "base_mean_c": null,
+     "snow_depth_mean_cm": 130.0,
+     "new_snow_min_cm": null,
+     "new_snow_max_cm": null,
+     "new_snow_mean_cm": null,
+     "days_recorded": 1
+    },
+    "livigno": {
+     "lifts_total": 32,
+     "runs_total": null,
+     "snow_depth_max_cm": 36,
+     "snow_depth_max_date": "2026-11-28",
+     "summit_min_c": null,
+     "summit_max_c": null,
+     "summit_lowest_mean_c": null,
+     "summit_highest_mean_c": null,
+     "base_min_c": null,
+     "base_max_c": null,
+     "base_lowest_mean_c": null,
+     "base_highest_mean_c": null,
+     "summit_mean_c": null,
+     "base_mean_c": null,
+     "snow_depth_mean_cm": 36.0,
+     "new_snow_min_cm": null,
+     "new_snow_max_cm": null,
+     "new_snow_mean_cm": null,
+     "days_recorded": 1
+    },
+    "zugspitze": {
+     "lifts_total": 8,
+     "runs_total": 12,
+     "snow_depth_max_cm": 40,
+     "snow_depth_max_date": "2026-11-28",
+     "summit_min_c": null,
+     "summit_max_c": null,
+     "summit_lowest_mean_c": null,
+     "summit_highest_mean_c": null,
+     "base_min_c": null,
+     "base_max_c": null,
+     "base_lowest_mean_c": null,
+     "base_highest_mean_c": null,
+     "summit_mean_c": null,
+     "base_mean_c": null,
+     "snow_depth_mean_cm": 40.0,
+     "new_snow_min_cm": null,
+     "new_snow_max_cm": null,
+     "new_snow_mean_cm": null,
+     "days_recorded": 1
+    },
+    "zell-am-see-kaprun": {
+     "lifts_total": 18,
+     "runs_total": 40,
+     "snow_depth_max_cm": 60,
+     "snow_depth_max_date": "2026-11-28",
+     "summit_min_c": null,
+     "summit_max_c": null,
+     "summit_lowest_mean_c": null,
+     "summit_highest_mean_c": null,
+     "base_min_c": null,
+     "base_max_c": null,
+     "base_lowest_mean_c": null,
+     "base_highest_mean_c": null,
+     "summit_mean_c": null,
+     "base_mean_c": null,
+     "snow_depth_mean_cm": 60.0,
+     "new_snow_min_cm": null,
+     "new_snow_max_cm": null,
+     "new_snow_mean_cm": null,
+     "days_recorded": 1
     }
    },
    "files": {
@@ -952,7 +1036,9 @@
      "2026-11-27",
      "2026-11-28"
     ],
-    "europe": [],
+    "europe": [
+     "2026-11-28"
+    ],
     "north-america": []
    }
   }
@@ -1010,6 +1096,19 @@
     "url": "https://www.niseko.ne.jp/en/map/",
     "note": "Niseko United trail maps"
    }
+  },
+  "hakuba-valley": {
+   "name": "Hakuba Valley",
+   "region": "Nagano",
+   "country": "Japan",
+   "timezone": "Asia/Tokyo",
+   "resorts": [
+    "hakuba-goryu",
+    "hakuba-47",
+    "hakuba-happo-one"
+   ],
+   "website": "https://www.hakubavalley.com/en/",
+   "source_url": "http://hakubavalley.com/en/weather_en/"
   }
  }
 }
