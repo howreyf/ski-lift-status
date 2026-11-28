@@ -1061,7 +1061,7 @@ async function renderHistoryPage(id, unit, value, carry = null) {
 
   view.innerHTML = `
     ${IS_DEMO ? `<div class="demo-banner">Demo mode: season 2025-26 is made-up data for testing. Remove <code>?demo</code> from the address to see only real data.</div>` : ""}
-    ${backLinkHtml({ hash: "#/history", label: "Historical" })}
+    <nav class="breadcrumb" aria-label="Breadcrumb"><a href="#/history">Historical</a> › <span>${esc(info.name)}</span></nav>
     <div class="resort-head">
       <div>
         <h1 class="page-title">${esc(info.name)}${nightIcon(nightSkiing(id, start))} <span class="badge-historical">Historical</span></h1>
