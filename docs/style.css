@@ -507,6 +507,11 @@ td.num { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .cmp-col-head .picker { min-width: 0; max-width: none; }
 .cmp-line .picker { min-width: 0; }
 .cmp-sync-note { margin: -6px 0 12px; }
+.cmp-range-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 14px; padding: 10px 12px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+}
+.cmp-range-title { font-size: 13px; font-weight: 700; color: var(--muted); }
 .cmp-section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 4px 12px; margin-bottom: 10px; }
 .cmp-section > summary { cursor: pointer; padding: 10px 0; font-weight: 700; color: var(--accent); }
 .cmp-section .cmp-grid { padding-bottom: 12px; }
