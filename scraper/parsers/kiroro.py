@@ -24,9 +24,13 @@ NAMES_EN = {
 
 
 def _table_after_heading(soup: BeautifulSoup, heading: str):
+    """The table under this heading, or None if the section has no table. (On 28 Nov 2026 the
+    lift table was missing in the morning; taking the next table on the page recorded the 24
+    courses as lifts.)"""
     for h in soup.select("section h6"):
         if clean_text(h.get_text()).upper() == heading:
-            return h.find_next("table")
+            for el in h.find_all_next(["table", "h6"]):
+                return el if el.name == "table" else None  # the next heading came first: no table
     return None
 
 

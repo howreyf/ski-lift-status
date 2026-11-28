@@ -1,17 +1,19 @@
-// Sorting the resort tables (Resorts tab and Historical tab).
+// Sorting and filtering the resort tables (Resorts tab and Historical tab).
 //
-// A "Sort" button beside the "Find resort" search opens a small panel: sort by number of
-// runs or lifts, lifts or runs open, runs (or runs open) of one difficulty, snow depth,
-// temperature or night skiing; high to low or low to high; and "Keep resorts in their
-// regions" (sorted inside each region dropdown) or one list for all resorts. Resorts with no
-// value (N/A) always go last. The choice is shared by both tabs and kept in the browser.
-// On the Historical tab the values are for the chosen season or month (peak open, means).
-// Loaded before app.js; uses its helpers at run time.
+// Resorts are listed in a dropdown per country (Japan, Italy, USA...), with their regions as
+// small headings inside. Country buttons under the search show only the chosen countries
+// (none chosen = all). A "Sort" button beside the "Find resort" search opens a small panel:
+// sort by number of runs or lifts, lifts or runs open, runs (or runs open) of one
+// difficulty, snow depth, temperature or night skiing; high to low or low to high; and "Keep
+// resorts in their countries" (sorted inside each country dropdown) or one list for all.
+// Resorts with no value (N/A) always go last. The choices are shared by both tabs and kept
+// in the browser. On the Historical tab the values are for the chosen season or month
+// (peak open, means). Loaded before app.js; uses its helpers at run time.
 
 "use strict";
 
 const SORT_KEYS = [
-  { key: "default", label: "Region (default order)" },
+  { key: "default", label: "Country and region (default order)" },
   { key: "runsTotal", label: "Number of runs" },
   { key: "liftsTotal", label: "Number of lifts" },
   { key: "liftsOpen", label: "Lifts open", hist: "Peak lifts open" },
@@ -48,7 +50,7 @@ function sortKeyInfo(key) {
   return SORT_KEYS.find(k => k.key === key);
 }
 function gradeWord(grade) {
-  return { green: "green", red: "red", black: "black", orange: "expert" }[grade];
+  return GRADES.find(g => g.key === grade)?.word || grade;
 }
 /** "Snow depth", "Runs open (black)", "Peak lifts open" ... */
 function sortLabel(s, hist) {
@@ -66,7 +68,7 @@ function runsOfGrade(runs, grade, openOnly = false) {
 
 /** Resorts tab: today's (live) values. */
 function presentSortValue(id, s) {
-  if (s.key === "night") return nightSkiing(id, state.latestDate) ? 1 : 0;
+  if (s.key === "night") return nightSkiing(id, latestDateOf(id)) ? 1 : 0;
   const r = currentResult(id);
   if (s.key === "liftsTotal") return seasonSummary(id).lifts_total ?? (r?.ok ? r.lifts.length : null);
   if (s.key === "temp") {
@@ -134,15 +136,57 @@ function sortNoteHtml(id) {
   return `<span class="sort-note">${esc(text)}</span>`;
 }
 
+// ------------------------------------------------------------------ country filter
+
+/** Countries the visitor chose to show (empty = all), only ones that still exist. */
+function countryFilter() {
+  const known = new Set(resortIds().map(countryOf));
+  return readList("countryFilter").filter(c => known.has(c));
+}
+
+/** Resorts in the chosen countries (all when none is chosen), in the usual order. */
+function shownIds() {
+  const chosen = countryFilter();
+  return chosen.length ? resortIds().filter(id => chosen.includes(countryOf(id))) : resortIds();
+}
+
+/** "All · Japan · Italy · ..." toggle buttons; several countries can be on at once. */
+function countryFilterHtml() {
+  const all = [...countries().keys()];
+  if (all.length < 2) return "";
+  const chosen = countryFilter();
+  const btn = (value, label, on, count) => `
+    <button type="button" class="chip${on ? " is-on" : ""}" aria-pressed="${on}" data-country-filter="${esc(value)}">${esc(label)}${
+      count != null ? ` <span class="chip-count">${count}</span>` : ""}</button>`;
+  const sizes = countries();
+  return `
+    <div class="country-filter" role="group" aria-label="Show countries">
+      ${btn("", "All countries", !chosen.length, null)}
+      ${all.map(c => btn(c, c, chosen.includes(c), [...sizes.get(c).values()].reduce((n, ids) => n + ids.length, 0))).join("")}
+    </div>`;
+}
+
+function setupCountryFilter(root, redraw) {
+  root.querySelectorAll("[data-country-filter]").forEach(b => b.addEventListener("click", () => {
+    const c = b.dataset.countryFilter;
+    const list = countryFilter();
+    writeList("countryFilter", !c ? [] : list.includes(c) ? list.filter(x => x !== c) : [...list, c]);
+    redraw();
+  }));
+}
+
 // ------------------------------------------------------------------ table groups
 
-/** Pinned group, then either the region dropdowns (each sorted) or one sorted list. */
+/** Pinned group, then either the country dropdowns (regions as headings inside; sorted
+ *  inside each country when a sort is chosen) or one sorted list. Only the countries chosen
+ *  in the filter are listed; pinned resorts always show. */
 function resortGroupsHtml(rowFn, valueOf, hist) {
   const s = sortState();
   const order = ids => orderIds(ids, valueOf, s);
   activeSort = s.key === "default" ? null : { s, valueOf, hist };
   const pinned = pins.list();
-  const closed = closedRegions();
+  const closed = closedCountries();
+  const chosen = countryFilter();
   let html = "";
   if (pinned.length) {
     html += `
@@ -152,11 +196,18 @@ function resortGroupsHtml(rowFn, valueOf, hist) {
       </section>`;
   }
   if (s.key === "default" || s.regions) {
-    for (const [region, ids] of regions()) {
+    for (const [country, regionsOf] of countries()) {
+      if (chosen.length && !chosen.includes(country)) continue;
+      const ids = [...regionsOf.values()].flat();
+      // Default order: region headings (when the country has more than one region).
+      // Sorted: one list inside the country (the region is shown under each name).
+      const body = s.key !== "default" ? order(ids).map(rowFn).join("")
+        : [...regionsOf].map(([region, rIds]) => `${regionsOf.size > 1 ? `<h3 class="region-title">${esc(region)}</h3>` : ""}${
+            rIds.map(rowFn).join("")}`).join("");
       html += `
-        <details class="group region" data-region="${esc(region)}"${closed.includes(region) ? "" : " open"}>
-          <summary class="group-title">${esc(region)} <span class="count">${ids.length}</span></summary>
-          ${order(ids).map(rowFn).join("")}
+        <details class="group country${s.key === "default" && regionsOf.size > 1 ? " by-region" : ""}" data-country="${esc(country)}"${closed.includes(country) ? "" : " open"}>
+          <summary class="group-title">${esc(country)} <span class="count">${ids.length}</span></summary>
+          ${body}
         </details>`;
     }
   } else {
@@ -164,7 +215,7 @@ function resortGroupsHtml(rowFn, valueOf, hist) {
       <section class="group group-sorted">
         <h2 class="group-title">${SORT_ICON} ${esc(sortLabel(s, hist))}
           <span class="count">${s.key === "night" ? (s.desc ? "night skiing first" : "night skiing last") : s.desc ? "high to low" : "low to high"}</span></h2>
-        ${order(resortIds()).map(rowFn).join("")}
+        ${order(shownIds()).map(rowFn).join("")}
       </section>`;
   }
   activeSort = null;
@@ -206,10 +257,11 @@ function searchRowHtml(hist) {
               <button type="button" role="radio" class="seg-btn${!s.desc ? " is-active" : ""}" aria-checked="${!s.desc}" data-sort-desc="0">${s.key === "night" ? "Night skiing last" : "Low to high"}</button>
             </div>` : ""}
           <label class="sort-check"><input type="checkbox" data-sort-regions${s.regions ? " checked" : ""}${on ? "" : " disabled"}>
-            Keep resorts in their regions</label>
+            Keep resorts in their countries</label>
         </div>
       </div>
-    </div>`;
+    </div>
+    ${countryFilterHtml()}`;
 }
 
 /** Wire up the Sort panel; `redraw` re-renders the page after a change. */
@@ -246,6 +298,7 @@ function setupSort(root, redraw) {
     change();
   }));
   pop.querySelector("[data-sort-regions]").addEventListener("change", e => { s.regions = e.target.checked; change(); });
+  setupCountryFilter(root, () => { sortPanelOpen = false; redraw(); });
 
   if (sortPanelOpen) open();
 }

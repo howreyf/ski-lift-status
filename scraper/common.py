@@ -6,6 +6,7 @@ import re
 import time
 import unicodedata
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -20,6 +21,25 @@ STATUSES = ("open", "closed", "hold", "unknown")
 
 def now_jst() -> datetime:
     return datetime.now(JST).replace(microsecond=0)
+
+
+def now_in(tz: str) -> datetime:
+    """The time now at a resort, e.g. now_in("Europe/Rome")."""
+    return datetime.now(ZoneInfo(tz)).replace(microsecond=0)
+
+
+def to_local_iso(s: str | None, fmt: str, tz: str) -> str | None:
+    """Parse a resort's local timestamp (no zone in the text) into ISO format with its offset."""
+    try:
+        return datetime.strptime(clean_text(s), fmt).replace(tzinfo=ZoneInfo(tz)).isoformat()
+    except (ValueError, TypeError):
+        return None
+
+
+def cm_from_inches(v) -> int | None:
+    """19 (inches) -> 48 (cm). None / '' stay None."""
+    n = to_number(None if v is None else str(v))
+    return None if n is None else round(n * 2.54)
 
 
 # ---------------------------------------------------------------- fetching
@@ -192,16 +212,27 @@ def level_en(raw: str | None) -> str:
     return "/".join(level for _, level in sorted(found)) or NA
 
 
+# Difficulty names outside Japan, stored as they are (the website colours them):
+#   Europe:        "Blue", "Red", "Black"
+#   North America: "Green circle", "Blue square", "Double blue square", "Black diamond",
+#                  "Double black diamond", "Terrain park"
+GRADE_NAMES = ("Green", "Blue", "Red", "Black", "Green circle", "Blue square", "Double blue square",
+               "Black diamond", "Double black diamond", "Terrain park")
+
+
 def run(name: str, raw: str, *, name_en: str | None = None, status: str | None = None,
-        level: str | None = None) -> dict:
-    """Build one run (course/slope) record with the standard fields."""
+        level: str | None = None, grade: str | None = None) -> dict:
+    """Build one run (course/slope) record with the standard fields. `level` is a Japanese
+    resort's wording (turned into Beginner/Intermediate/...); `grade` is one of GRADE_NAMES."""
     name = clean_text(name)
+    if grade is not None and grade not in GRADE_NAMES:
+        raise ValueError(f"unknown grade {grade!r}")
     return {
         "name": name,
         "name_en": clean_text(name_en) or name,
         "status": status or run_status_from_text(raw),
         "raw": clean_text(raw),
-        "level": level_en(level) if level else NA,
+        "level": grade or (level_en(level) if level else NA),
     }
 
 
@@ -209,8 +240,10 @@ def run(name: str, raw: str, *, name_en: str | None = None, status: str | None =
 
 _LIFT_TYPE_WORDS = [
     ("Ropeway", ["ropeway", "ロープウェイ", "ロープウエイ", "ロープウェー", "aerial tram"]),
-    ("Gondola", ["gondola", "gondla", "ゴンドラ", "cabin"]),
-    ("Magic carpet", ["carpet", "escalator", "escalater", "moving walk", "ムービング", "エスカレーター", "ベルト"]),
+    ("Gondola", ["gondola", "gondla", "ゴンドラ", "cabin", "telecabina", "kabinenbahn", "funitel"]),
+    ("Magic carpet", ["carpet", "escalator", "escalater", "moving walk", "ムービング", "エスカレーター", "ベルト", "tappeto"]),
+    ("Surface lift", ["t-bar", "t bar", "drag lift", "draglift", "platter", "poma", "rope tow", "skilift", "sciovia", "schlepp"]),
+    ("Train", ["cogwheel", "funicular", "standseil", "zahnrad"]),
     ("Six", ["sixpack", "six-pack", "six ", "6-seat", "6 seat", "シックス", "6人乗り"]),
     ("Quad", ["quad", "クワッド", "クワット", "クワトロ", "four", "フォー", "4-seat", "4 seat", "4人乗り"]),
     ("Triple", ["triple", "トリプル", "3-seat", "3 seat", "3人乗り"]),

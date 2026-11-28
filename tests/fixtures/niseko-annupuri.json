@@ -1,0 +1,70 @@
+{
+ "results": [
+  {
+   "id": 1315,
+   "object_id": "XdKR9mBSLJ2rr2vK",
+   "name": "Annupuri Gondola",
+   "comment": "",
+   "status": "SUSPENDED",
+   "start_time": "",
+   "end_time": "",
+   "groomed": "なし",
+   "updateDate": "2026-11-26T22:52:38.000000Z"
+  },
+  {
+   "id": 1316,
+   "object_id": "TiI3DDS3DetpZOjd",
+   "name": "Dream Quad Lift #1",
+   "comment": "",
+   "status": "OPERATING",
+   "start_time": "8:30",
+   "end_time": "16:00",
+   "groomed": "なし",
+   "updateDate": "2026-11-27T09:05:35.000000Z"
+  },
+  {
+   "id": 1317,
+   "object_id": "ljuQ6h8xzxItbmsK",
+   "name": "Jumbo Quad #1",
+   "comment": "",
+   "status": "OPERATING",
+   "start_time": "8:30",
+   "end_time": "16:00",
+   "groomed": "なし",
+   "updateDate": "2026-11-28T02:01:20.000000Z"
+  },
+  {
+   "id": 1318,
+   "object_id": "DzaDcUPXoQo7qODi",
+   "name": "Jumbo Pair #2",
+   "comment": "",
+   "status": "SUSPENDED",
+   "start_time": "",
+   "end_time": "",
+   "groomed": "なし",
+   "updateDate": "2026-11-04T01:52:00.000000Z"
+  },
+  {
+   "id": 1319,
+   "object_id": "X3klUF5MpQXNDiVO",
+   "name": "Jumbo Pair #3",
+   "comment": "",
+   "status": "SUSPENDED",
+   "start_time": "",
+   "end_time": "",
+   "groomed": "なし",
+   "updateDate": "2026-11-04T01:52:00.000000Z"
+  },
+  {
+   "id": 1320,
+   "object_id": "dNvXP0oEVZXnjdb9",
+   "name": "Jumbo Pair #4",
+   "comment": "",
+   "status": "SUSPENDED",
+   "start_time": "",
+   "end_time": "",
+   "groomed": "なし",
+   "updateDate": "2026-11-04T01:52:00.000000Z"
+  }
+ ]
+}

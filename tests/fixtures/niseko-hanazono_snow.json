@@ -1,0 +1,44 @@
+{
+ "results": [
+  {
+   "id": 479,
+   "object_id": "rOAzY0jWW4y3b9Ml",
+   "name": "Base",
+   "comment": null,
+   "snow_state": "Spring Conditions",
+   "snow_state_flg": false,
+   "snow_accumulation": 20,
+   "snow_accumulation_flg": false,
+   "snow_accumulation_difference": 0,
+   "temperature": 5,
+   "temperature_flg": false,
+   "weather": "Cloudy",
+   "weather_flg": false,
+   "cource_state": "Partially Open",
+   "cource_state_flg": false,
+   "wind_speed": "S1",
+   "createDate": "2018-11-18T07:00:31.000000Z",
+   "updateDate": "2026-11-27T23:24:03.000000Z"
+  },
+  {
+   "id": 594,
+   "object_id": "",
+   "name": "Peak",
+   "comment": null,
+   "snow_state": "Spring Conditions",
+   "snow_state_flg": false,
+   "snow_accumulation": 37,
+   "snow_accumulation_flg": false,
+   "snow_accumulation_difference": 0,
+   "temperature": 6,
+   "temperature_flg": false,
+   "weather": "Cloudy",
+   "weather_flg": false,
+   "cource_state": "Partially Open",
+   "cource_state_flg": false,
+   "wind_speed": "W1",
+   "createDate": "2024-11-29T06:35:34.000000Z",
+   "updateDate": "2026-11-27T23:24:03.000000Z"
+  }
+ ]
+}

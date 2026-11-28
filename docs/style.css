@@ -12,9 +12,11 @@
   --unknown-bg: #ece6f7; --unknown-fg: #5a3e8c;
   --warn: #8a5a00;
   --grade-green: #2b8a3e;
+  --grade-blue: #1971c2;
   --grade-red: #c92a2a;
   --grade-black: #212529;
   --grade-orange: #d9480f;
+  --grade-park: #7048e8;
   --grade-other: #868e96;
   --shadow: 0 8px 24px rgba(20, 30, 50, .12);
 }
@@ -198,7 +200,25 @@ details[open] > summary.group-title::before { transform: rotate(45deg); }
 .cell { min-width: 0; font-variant-numeric: tabular-nums; }
 .cell-name { font-weight: 600; }
 .cell-note { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
-.region .cell-name .cell-note { display: none; } /* region is already the group heading */
+.by-region .cell-name .cell-note { display: none; } /* region is already the heading above */
+.region-title {
+  margin: 0; padding: 8px 14px 4px; border-top: 1px solid var(--line);
+  font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted);
+}
+.group-title + .region-title { border-top: 0; padding-top: 2px; }
+.region-title + .resort-row { border-top: 0; }
+
+/* country filter under the search */
+.country-filter { display: flex; flex-wrap: wrap; gap: 6px; margin: -8px 0 16px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px;
+  font: inherit; font-size: 14px; font-weight: 600; color: var(--text);
+  background: var(--card); border: 1px solid var(--line); border-radius: 999px; cursor: pointer;
+}
+.chip:hover { border-color: var(--accent); }
+.chip.is-on { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.chip-count { font-size: 12px; font-weight: 600; color: var(--muted); }
+.chip.is-on .chip-count { color: inherit; opacity: .8; }
 
 .pin {
   width: 44px; flex: none;
@@ -221,9 +241,12 @@ details[open] > summary.group-title::before { transform: rotate(45deg); }
   font-size: 12px; font-weight: 700; color: #fff; line-height: 1;
 }
 .grade-green { background: var(--grade-green); }
+.grade-blue { background: var(--grade-blue); }
 .grade-red { background: var(--grade-red); }
 .grade-black { background: var(--grade-black); box-shadow: inset 0 0 0 1px rgba(255,255,255,.35); }
+.grade-double { background: var(--grade-black); box-shadow: inset 0 0 0 2px var(--grade-black), inset 0 0 0 3px rgba(255,255,255,.7); }
 .grade-orange { background: var(--grade-orange); }
+.grade-park { background: var(--grade-park); }
 .grade-other { background: var(--grade-other); }
 .legend { margin-top: 10px; line-height: 2; }
 .legend .grade { min-width: 0; width: 14px; height: 14px; padding: 0; margin-left: 8px; vertical-align: -2px; }

@@ -1,29 +1,33 @@
-"""Scrape every enabled resort in resorts.yaml and save the results under docs/data/.
+"""Scrape the enabled resorts in resorts.yaml and save the results under docs/data/.
 
 Usage (from the project folder):
-    python -m scraper.run                                  # all enabled resorts (in season only)
+    python -m scraper.run                                  # resorts whose local time is 09:00-21:00
     python -m scraper.run --daily                          # also rewrite today's daily record now
-    python -m scraper.run --force                          # scrape even outside the season
+    python -m scraper.run --force                          # every resort now, even off-season / at night
     python -m scraper.run --only zao-onsen                 # one resort (any time of year)
     python -m scraper.run --only zao-onsen --html tests/fixtures/zao.html
                                                            # use a saved page instead of downloading
+    python -m scraper.run --needs-browser                  # print "yes" if a resort due now needs Playwright
 
-GitHub runs this every 45 minutes from 09:08 to 21:08 Japan time. Every run:
-    - updates docs/data/live.json with the latest lift and run status (only if something
-      changed; the file is replaced, not added to)
-and the first run at or after daily_time (09:30, set in resorts.yaml) each day also:
-    - writes the day's permanent record (lifts, runs, snow depth, new snow) to
-      docs/data/seasons/<season>.json, adds the weather (scraper/weather.py) and
-      updates the season summary in docs/data/lifts.json
+GitHub starts this every 45 minutes around the clock. Each run only scrapes the resorts whose
+LOCAL time is inside the schedule (09:00-21:00, set in resorts.yaml) and whose group is in
+season. For each of them, every run:
+    - updates its group's live file (e.g. docs/data/live-europe.json) with the latest lift and
+      run status (only if something changed; the file is replaced, not added to)
+and the first run at or after daily_time (09:30 local) each day also:
+    - writes the resort's permanent record for that day (lifts, runs, snow depth, new snow)
+      to its group's season file, adds the weather (scraper/weather.py) and updates the
+      season summary in docs/data/lifts.json
 
-Files written:
-    docs/data/lifts.json             small index: resorts, season summaries, which dates exist
-    docs/data/seasons/2026-27.json   every day of one season (lifts and runs), no indentation
-    docs/data/live.json              the latest lift/run status (today only)
+Files written (one set per group in resorts.yaml: japan, europe, north-america):
+    docs/data/lifts.json                          small index: groups, resorts, season summaries
+    docs/data/seasons/2026-27.json                Japan: every day of one season, no indentation
+    docs/data/seasons/europe/2026-27.json         Europe: the same
+    docs/data/live.json, live-europe.json, ...    the latest lift/run status per group
 
-Outside the season months set in resorts.yaml, nothing is scraped. Instead, once a month
-the "last_checked" time in lifts.json is updated so the GitHub workflow has something to
-commit; GitHub switches off scheduled workflows in repositories with no activity for 60 days.
+When every group is off-season, nothing is scraped. Instead, once a month the "last_checked"
+time in lifts.json is updated so the GitHub workflow has something to commit; GitHub switches
+off scheduled workflows in repositories with no activity for 60 days.
 """
 
 from __future__ import annotations
@@ -34,23 +38,31 @@ import importlib
 import json
 import sys
 import traceback
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import yaml
 
 from scraper import alerts
-from scraper.common import RUN_STATUSES, STATUSES, fetch, now_jst
+from scraper.common import RUN_STATUSES, STATUSES, fetch
 from scraper.weather import LEVELS, PAST_DAYS, apply_temps, fetch_weather, has_location
 
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT / "resorts.yaml"
 DATA_DIR = ROOT / "docs" / "data"
 INDEX_PATH = DATA_DIR / "lifts.json"
-LIVE_PATH = DATA_DIR / "live.json"     # latest lift/run status, replaced on every run
+LIVE_PATH = DATA_DIR / "live.json"     # Japan's latest lift/run status, replaced on every run
+SEASON_PATTERN = "seasons/{season}.json"
 
 LIFT_FIELDS = ("name", "name_en", "status", "raw", "hours", "lift_type")
 RUN_FIELDS = ("name", "name_en", "status", "raw", "level")
+
+# Used when resorts.yaml has no `groups` (older config): everything is one Japanese group.
+DEFAULT_GROUPS = {"japan": {"name": "Japan", "country": "Japan", "timezone": "Asia/Tokyo",
+                            "live_file": "live.json", "season_file": SEASON_PATTERN,
+                            "season": {"start_month": 11, "end_month": 5}}}
+DEFAULT_SCHEDULE = {"hours": ["09:00", "21:00"], "until": "22:00", "daily_time": "09:30"}
 
 
 # ---------------------------------------------------------------- config
@@ -60,18 +72,51 @@ def load_settings(path: Path = CONFIG_PATH) -> dict:
         return yaml.safe_load(f)
 
 
+def groups_of(settings: dict) -> dict[str, dict]:
+    groups = settings.get("groups") or DEFAULT_GROUPS
+    if "season" in settings and "groups" not in settings:  # older config: one season block
+        groups = {"japan": dict(DEFAULT_GROUPS["japan"], season=settings["season"])}
+    return groups
+
+
+def schedule_of(settings: dict) -> dict:
+    s = dict(DEFAULT_SCHEDULE, **(settings.get("schedule") or {}))
+    if "daily_time" in (settings.get("season") or {}):  # older config
+        s["daily_time"] = settings["season"]["daily_time"]
+    return s
+
+
+def resolve(resort: dict, groups: dict[str, dict]) -> dict:
+    """The resort with its group's defaults filled in (group, country, timezone)."""
+    r = dict(resort)
+    r.setdefault("group", next(iter(groups)))
+    if r["group"] not in groups:
+        raise ValueError(f"{r['id']}: unknown group {r['group']!r}")
+    g = groups[r["group"]]
+    r.setdefault("country", g.get("country") or "")
+    r.setdefault("timezone", g.get("timezone") or "UTC")
+    return r
+
+
 def load_config(path: Path = CONFIG_PATH) -> list[dict]:
-    return load_settings(path)["resorts"]
+    settings = load_settings(path)
+    groups = groups_of(settings)
+    return [resolve(r, groups) for r in settings["resorts"]]
 
 
-def season_months(settings: dict) -> tuple[int, int]:
-    s = settings.get("season") or {}
+def season_months(group: dict) -> tuple[int, int]:
+    s = group.get("season") or {}
     return int(s.get("start_month", 11)), int(s.get("end_month", 4))
 
 
 def in_season(month: int, start: int, end: int) -> bool:
     """in_season(12, 11, 4) -> True. Handles seasons that cross New Year."""
     return start <= month <= end if start <= end else month >= start or month <= end
+
+
+def in_hours(hhmm: str, schedule: dict) -> bool:
+    """Inside the scraping hours (local time): from hours[0] until `until` (runs start late)."""
+    return schedule["hours"][0] <= hhmm <= schedule.get("until", schedule["hours"][1])
 
 
 def season_of(date: str) -> str:
@@ -102,34 +147,36 @@ def _write_json(path: Path, data: dict, compact: bool) -> None:
     tmp.replace(path)  # only replace the real file once writing succeeded
 
 
-def season_file(label: str) -> str:
+def season_file(label: str, pattern: str = SEASON_PATTERN) -> str:
     """Path of a season's file, relative to docs/data/ (this is what the website fetches)."""
-    return f"seasons/{label}.json"
+    return pattern.format(season=label)
 
 
-def load_index(path: Path = INDEX_PATH) -> dict:
-    index = _read_json(path)
+# Paths default to None and are looked up when called, so DATA_DIR / INDEX_PATH can be pointed
+# elsewhere (e.g. a copy of the site) after importing this module.
+
+def load_index(path: Path | None = None) -> dict:
+    index = _read_json(path or INDEX_PATH)
     index.setdefault("last_updated", None)   # last time lift data was scraped
     index.setdefault("last_checked", None)   # last time the scraper ran (incl. off-season check-ins)
-    index.setdefault("season_months", None)
     index.setdefault("resorts", {})
-    index.setdefault("seasons", {})          # label -> {file, dates, summary}
+    index.setdefault("seasons", {})          # label -> {files, dates, summary}
     return index
 
 
-def save_index(index: dict, path: Path = INDEX_PATH) -> None:
-    _write_json(path, index, compact=False)  # small, so keep it readable
+def save_index(index: dict, path: Path | None = None) -> None:
+    _write_json(path or INDEX_PATH, index, compact=False)  # small, so keep it readable
 
 
-def load_season(label: str, data_dir: Path = DATA_DIR) -> dict:
-    season = _read_json(data_dir / season_file(label))
+def load_season(label: str, data_dir: Path | None = None, pattern: str = SEASON_PATTERN) -> dict:
+    season = _read_json((data_dir or DATA_DIR) / season_file(label, pattern))
     season.setdefault("season", label)
     season.setdefault("days", [])
     return season
 
 
-def save_season(season: dict, data_dir: Path = DATA_DIR) -> None:
-    _write_json(data_dir / season_file(season["season"]), season, compact=True)
+def save_season(season: dict, data_dir: Path | None = None, pattern: str = SEASON_PATTERN) -> None:
+    _write_json((data_dir or DATA_DIR) / season_file(season["season"], pattern), season, compact=True)
 
 
 # ---------------------------------------------------------------- scraping
@@ -141,27 +188,35 @@ def fetch_once(url: str, method: str, referer: str | None) -> str:
     return fetch(url, method, referer=referer)
 
 
-def scrape_resort(resort: dict, html_override: str | None = None) -> dict:
+def scrape_resort(resort: dict, html_override: str | None = None, now: datetime | None = None) -> dict:
     """Run one resort's parser and return its record for today. Never raises."""
-    scraped_at = now_jst().isoformat()
+    now = now or datetime.now(ZoneInfo(resort.get("timezone") or "Asia/Tokyo")).replace(microsecond=0)
+    scraped_at = now.isoformat()
     try:
         parser = importlib.import_module(f"scraper.parsers.{resort['parser']}")
+        method = resort.get("fetch", "html")
         if html_override is not None:
             html = html_override
         elif resort.get("data_url"):  # resort publishes its data separately (e.g. a JSON feed)
-            html = fetch_once(resort["data_url"], resort.get("fetch", "html"), resort["url"])
+            html = fetch_once(resort["data_url"], method, resort["url"])
         else:
-            html = fetch_once(resort["url"], resort.get("fetch", "html"), None)
+            html = fetch_once(resort["url"], method, None)
         parsed = parser.parse(html, resort.get("options") or {})
 
-        # Some resorts publish run status on a separate page (runs_url). If that page fails,
-        # the lifts are still recorded, just without runs.
+        # Some resorts publish run status (runs_url) or the snow report (snow_url) on a separate
+        # page. If that page fails, the lifts are still recorded, just without it.
         if resort.get("runs_url") and html_override is None:
             try:
-                runs_html = fetch_once(resort["runs_url"], resort.get("fetch", "html"), None)
+                runs_html = fetch_once(resort["runs_url"], method, resort["url"])
                 parsed["runs"] = parser.parse_runs(runs_html, resort.get("options") or {})
             except Exception as e:
                 print(f"  runs page failed ({type(e).__name__}: {e}); recording lifts only")
+        if resort.get("snow_url") and html_override is None:
+            try:
+                snow = parser.parse_snow(fetch_once(resort["snow_url"], method, resort["url"]), resort.get("options") or {})
+                parsed.update({k: v for k, v in snow.items() if v is not None})
+            except Exception as e:
+                print(f"  snow report failed ({type(e).__name__}: {e}); recording without it")
 
         lifts = parsed.get("lifts") or []
         if not lifts:
@@ -275,10 +330,13 @@ def update_summary(summary: dict, season: dict, resort_id: str, result: dict | N
     summary["days_recorded"] = len(days)
 
 
-def update_weather(season: dict, resorts: list[dict], today: str) -> set[str]:
+def update_weather(seasons: dict[str, dict], resorts: list[dict], today_of: dict[str, str]) -> set[str]:
     """Add today's forecast and snow outlook, and yesterday's (and any missed day's) final
-    temperatures and snow hours. Never fails the run: if Open-Meteo can't be reached, the
+    temperatures and snow hours. `seasons` and `today_of` are per resort id (each resort's
+    season file and local date). Never fails the run: if Open-Meteo can't be reached, the
     next run catches up. Returns the ids of resorts whose weather changed."""
+    if not resorts:
+        return set()
     try:
         temps = fetch_weather(resorts)
     except Exception as e:
@@ -287,18 +345,19 @@ def update_weather(season: dict, resorts: list[dict], today: str) -> set[str]:
         return set()
     changed = set()
     for resort in resorts:
-        dates = apply_temps(season, resort, temps.get(resort["id"], {}), today)
-        if dates:
-            changed.add(resort["id"])
+        rid = resort["id"]
+        if apply_temps(seasons[rid], resort, temps.get(rid, {}), today_of[rid]):
+            changed.add(rid)
     print(f"Weather: temperatures updated for {len(changed)} resorts.")
     return changed
 
 
-def has_pending_forecasts(season: dict, today: str) -> bool:
+def has_pending_forecasts(season: dict, today: str, resort_ids: set[str] | None = None) -> bool:
     """Any recent past day still holding a forecast instead of final temperatures?"""
     oldest = (date.fromisoformat(today) - timedelta(days=PAST_DAYS)).isoformat()
     return any(oldest <= d["date"] < today and (r.get("temps") or {}).get("kind") == "forecast"
-               for d in season["days"] for r in d["results"].values())
+               and (resort_ids is None or rid in resort_ids)
+               for d in season["days"] for rid, r in d["results"].items())
 
 
 def monthly_check_in(index: dict, now_iso: str) -> bool:
@@ -320,47 +379,93 @@ def live_entry(result: dict) -> dict:
             "lifts": result["lifts"], "runs": result["runs"]}
 
 
-def update_live(results: dict[str, dict], today: str, now_iso: str, path: Path = LIVE_PATH,
+def _comparable(entry: dict) -> dict:
+    """Error wording varies between runs, and `changed` is bookkeeping: only the rest counts."""
+    return {k: v for k, v in entry.items() if k not in ("error", "changed")}
+
+
+def update_live(results: dict[str, dict], today: str | dict[str, str], now_iso: str, path: Path | None = None,
                 baseline: dict[str, dict] | None = None) -> bool:
-    """Replace live.json with this run's lift/run status. Same safeguards as the daily record:
-    a resort that failed, or returned fewer lifts than earlier today (Hakuba Valley's afternoon
-    page), keeps its earlier entry from today. `baseline` (today's permanent record) counts as
-    "earlier today" for resorts live.json doesn't have yet. The file is only rewritten when a
-    status actually changed, so quiet runs don't create a commit. Returns True if rewritten.
+    """Update a group's live file with this run's lift/run status. `today` is the local date
+    (one for all, or per resort id). Same safeguards as the daily record: a resort that
+    failed, or returned fewer lifts than earlier the same (local) day (Hakuba Valley's
+    afternoon page), keeps its earlier entry. `baseline` (today's permanent record) counts as
+    "earlier today" for resorts the file doesn't have yet. Resorts not scraped this run (e.g.
+    it's night there) keep their entry. Each entry has its local `date` and `changed` (when its
+    status last changed). The file is only rewritten when a status actually changed, so quiet
+    runs don't create a commit. Returns True if rewritten.
 
     A resort whose page can't be read gets "failing_since": the time of the first failed run
     in a row (kept across midnight, removed once the page works again). The website uses it
     to warn that the status shown may be out of date; scraper/alerts.py opens an issue when
     it has lasted for hours."""
+    path = path or LIVE_PATH
     old = _read_json(path)
-    same_day = old.get("date") == today
-    previous = old.get("results", {}) if same_day else {}
-    entries = {}
+    old_entries = {rid: ({"date": old.get("date"), **e} if "date" not in e and old.get("date") else e)
+                   for rid, e in (old.get("results") or {}).items()}
+    entries = dict(old_entries)
     for rid, result in results.items():
-        new, prev = live_entry(result), previous.get(rid) or (baseline or {}).get(rid)
+        day = today if isinstance(today, str) else today[rid]
+        old_e = old_entries.get(rid) or {}
+        prev = (old_e if old_e.get("date") == day else None) or (baseline or {}).get(rid)
+        new = live_entry(result)
         if prev and prev.get("ok") and (not new["ok"] or len(new["lifts"]) < len(prev["lifts"])):
-            new = dict(prev)
+            new = {k: v for k, v in prev.items() if k not in ("date", "changed")}
         new.pop("failing_since", None)
+        new.pop("error", None)
         if not result["ok"]:
-            new["failing_since"] = (old.get("results", {}).get(rid) or {}).get("failing_since") or now_iso
+            new["failing_since"] = old_e.get("failing_since") or now_iso
             new["error"] = result["error"]
+        new["date"] = day
+        new["changed"] = old_e.get("changed") or old.get("updated") or now_iso \
+            if _comparable(new) == _comparable(old_e) else now_iso
         entries[rid] = new
-    for rid, prev in previous.items():  # resorts not scraped this run (e.g. --only) stay as they were
-        entries.setdefault(rid, prev)
 
-    def comparable(e):  # error wording may vary between runs; only ok/lifts/runs matter
-        return {rid: {k: v for k, v in x.items() if k != "error"} for rid, x in e.items()}
-
-    if same_day and comparable(entries) == comparable(previous):
+    if old_entries and {r: _comparable(e) for r, e in entries.items()} == \
+            {r: _comparable(e) for r, e in old_entries.items()}:
         return False
-    _write_json(path, {"date": today, "updated": now_iso, "results": entries}, compact=True)
+    dates = [e["date"] for e in entries.values() if e.get("date")]
+    _write_json(path, {"date": max(dates) if dates else None, "updated": now_iso, "results": entries}, compact=True)
     return True
 
 
-def daily_due(season: dict, today: str, now_hhmm: str, daily_time: str) -> bool:
+def daily_due(season: dict, today: str, now_hhmm: str, daily_time: str, resort_id: str | None = None) -> bool:
     """The day's permanent record is written by the first run at or after daily_time
-    (09:30) that day. GitHub sometimes starts runs late, so this doesn't need an exact time."""
-    return now_hhmm >= daily_time and not any(d["date"] == today for d in season["days"])
+    (09:30 local) that day. GitHub sometimes starts runs late, so this doesn't need an exact
+    time. With `resort_id`: due if that resort has no record today yet."""
+    if now_hhmm < daily_time:
+        return False
+    day = next((d for d in season["days"] if d["date"] == today), None)
+    return day is None or (resort_id is not None and resort_id not in day["results"])
+
+
+def resort_info(resort: dict) -> dict:
+    """What lifts.json lists about a resort (from resorts.yaml)."""
+    return {
+        "name": resort["name"],
+        "region": resort["region"],
+        "country": resort.get("country") or "",
+        "group": resort["group"],
+        "timezone": resort["timezone"],
+        "source_url": resort["url"],
+        **({"website": resort["website"]} if resort.get("website") else {}),
+        **({"map": resort["map"]} if resort.get("map") else {}),
+        # Night skiing per season (dates, hours, lifts), from resorts.yaml.
+        **({"night_skiing": {str(k): {kk: (vv if isinstance(vv, list) else str(vv)) for kk, vv in v.items()}
+                             for k, v in resort["night_skiing"].items()}}
+           if resort.get("night_skiing") else {}),
+        # Position and heights: the website uses them to fetch live temperatures.
+        **({"location": {"lat": resort["location"]["lat"], "lon": resort["location"]["lon"]},
+            "elevation_m": {level: resort["elevation"][level] for level in LEVELS}}
+           if has_location(resort) else {}),
+    }
+
+
+def groups_info(groups: dict[str, dict], schedule: dict) -> dict:
+    """What lifts.json lists about the groups (the website loads each group's files)."""
+    return {g: {"name": v.get("name", g), "live": v["live_file"],
+                "season_months": dict(zip(("start", "end"), season_months(v)))}
+            for g, v in groups.items()}
 
 
 # ---------------------------------------------------------------- main
@@ -374,141 +479,190 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--only", help="run just this resort id (e.g. zao-onsen), even if disabled or off-season")
     ap.add_argument("--html", help="read the page from this saved file instead of downloading (needs --only)")
-    ap.add_argument("--force", action="store_true", help="scrape even outside the season months")
+    ap.add_argument("--force", action="store_true", help="scrape every resort now, even off-season or at night")
     ap.add_argument("--daily", action="store_true",
                     help="also (re)write today's permanent daily record now, whatever the time")
     ap.add_argument("--alerts", metavar="FILE",
                     help="write problems (resorts failing for hours, missing lifts/runs) to FILE "
                          "for scraper/alerts.py, which opens GitHub issues")
+    ap.add_argument("--needs-browser", action="store_true",
+                    help="only print yes/no: does a resort due now use fetch: browser (Playwright)?")
     args = ap.parse_args(argv)
 
     settings = load_settings()
-    start, end = season_months(settings)
-    daily_time = str((settings.get("season") or {}).get("daily_time", "09:30"))
-    resorts = settings["resorts"]
+    groups, schedule = groups_of(settings), schedule_of(settings)
+    daily_time = schedule["daily_time"]
+    every = [resolve(r, groups) for r in settings["resorts"]]
     if args.only:
-        resorts = [r for r in resorts if r["id"] == args.only]
+        resorts = [r for r in every if r["id"] == args.only]
         if not resorts:
             ap.error(f"no resort with id {args.only!r} in resorts.yaml")
     else:
-        resorts = [r for r in resorts if r.get("enabled", True)]
+        resorts = [r for r in every if r.get("enabled", True)]
     if args.html and not args.only:
         ap.error("--html needs --only")
     html_override = Path(args.html).read_text(encoding="utf-8") if args.html else None
 
-    index = load_index()
-    index["season_months"] = {"start": start, "end": end}
-    index["daily_time"] = daily_time
-    now = now_jst()
+    now_utc = datetime.now(timezone.utc).replace(microsecond=0)
+    local = {r["id"]: now_utc.astimezone(ZoneInfo(r["timezone"])) for r in resorts}
+    today_of = {rid: t.date().isoformat() for rid, t in local.items()}
 
-    today = now.date().isoformat()
-    label = season_of(today)
+    def group_in_season(r: dict) -> bool:
+        return in_season(local[r["id"]].month, *season_months(groups[r["group"]]))
 
-    if not (in_season(now.month, start, end) or args.force or args.only):
-        changed_files = False
-        # First off-season days: the last season days still hold a forecast; finish them.
-        season = load_season(label)
-        if has_pending_forecasts(season, today):
-            changed = update_weather(season, resorts, today)
-            summaries = index["seasons"].get(label, {}).get("summary", {})
-            for rid in changed:
-                update_summary(summaries.setdefault(rid, {}), season, rid, None)
-            if changed:
-                save_season(season)
-                changed_files = True
-        if monthly_check_in(index, now.isoformat()):
-            print("Off-season: no scraping. Saved this month's check-in (keeps the GitHub schedule active).")
-            changed_files = True
-        else:
-            print("Off-season: no scraping, and this month's check-in is already saved.")
-        if changed_files:
-            save_index(index)
+    due = [r for r in resorts if args.only or args.force
+           or (group_in_season(r) and in_hours(local[r["id"]].strftime("%H:%M"), schedule))]
+    if args.needs_browser:
+        print("yes" if any(r.get("fetch") == "browser" for r in due) else "no")
         return 0
 
-    season = load_season(label)
-    write_daily = args.daily or args.only or daily_due(season, today, now.strftime("%H:%M"), daily_time)
-    print(f"{now.strftime('%H:%M')} JST: lift/run status for all resorts"
-          f"{' + daily record (snow, weather, history)' if write_daily else ''}")
+    index = load_index()
+    index["groups"] = groups_info(groups, schedule)
+    index["schedule"] = {"hours": schedule["hours"], "daily_time": daily_time}
+    index.pop("season_months", None)  # older format (one season for all); now per group
+    index["daily_time"] = daily_time
 
-    # 1. Scrape every resort (lift and run status, and the daily numbers).
+    # Season files touched this run: (group, label) -> season
+    seasons: dict[tuple[str, str], dict] = {}
+
+    def season_for(r: dict) -> dict:
+        key = (r["group"], season_of(today_of[r["id"]]))
+        if key not in seasons:
+            seasons[key] = load_season(key[1], pattern=groups[r["group"]]["season_file"])
+        return seasons[key]
+
+    if not due:
+        return off_season_or_night(index, resorts, groups, group_in_season, season_for, seasons,
+                                   today_of, now_utc)
+
+    print(f"{now_utc.strftime('%H:%M')} UTC: {len(due)} resorts due "
+          f"({', '.join(sorted({groups[r['group']].get('name', r['group']) for r in due}))})")
+
+    # 1. Scrape (lift and run status, and the daily numbers).
     results, failures = {}, 0
-    for resort in resorts:
-        print(f"{resort['id']}: scraping {resort['url']}")
-        result = results[resort["id"]] = scrape_resort(resort, html_override)
+    for resort in due:
+        rid = resort["id"]
+        print(f"{rid} ({local[rid].strftime('%H:%M')} local): scraping {resort['url']}")
+        result = results[rid] = scrape_resort(resort, html_override, local[rid])
         if result["ok"]:
             print(f"  ok: {result['lifts_open']}/{result['_lifts_total']} lifts open")
         else:
             failures += 1
             print(f"  FAILED: {result['error']}")
 
-    # 2. Live status: replace live.json if anything changed. Today's permanent record (if
-    #    already written) is the fallback "earlier reading" for the safeguards.
-    today_record = next((d["results"] for d in season["days"] if d["date"] == today), {})
-    baseline = {rid: live_entry(dict(r, error=r.get("error"))) for rid, r in today_record.items()
-                if r.get("ok") and "lifts" in r}
-    live_changed = update_live(results, today, now.isoformat(), baseline=baseline)
-    print("Live status: changed, live.json updated." if live_changed else "Live status: no change.")
+    problems, checked, written = [], [], []
+    for g, group in groups.items():
+        gres = [r for r in due if r["group"] == g]
+        if not gres:
+            continue
+        # 2. Live status: update the group's live file if anything changed. Today's permanent
+        #    record (if already written) is the fallback "earlier reading" for the safeguards.
+        baseline = {}
+        for r in gres:
+            day = next((d for d in season_for(r)["days"] if d["date"] == today_of[r["id"]]), None)
+            rec = (day or {}).get("results", {}).get(r["id"])
+            if rec and rec.get("ok") and "lifts" in rec:
+                baseline[r["id"]] = live_entry(dict(rec, error=rec.get("error")))
+        live_path = DATA_DIR / group["live_file"]
+        changed = update_live({r["id"]: results[r["id"]] for r in gres}, {r["id"]: today_of[r["id"]] for r in gres},
+                              now_utc.isoformat(), live_path, baseline=baseline)
+        print(f"Live status ({g}): {'changed, ' + group['live_file'] + ' updated' if changed else 'no change'}.")
 
-    # Problems worth an alert: a resort failing for hours (any run); far fewer lifts/runs
-    # than usual (daily record only, so Hakuba's shorter afternoon page doesn't count).
-    live_now = _read_json(LIVE_PATH).get("results", {})
-    problems, checked = [], []
-    for resort in resorts:
-        rid, result = resort["id"], results[resort["id"]]
-        if p := alerts.down_problem(resort, live_now.get(rid), now):
-            problems.append(p)
-        if result["ok"]:
-            checked.append(f"down:{rid}")
-            if write_daily:
-                checked += [f"drop-lifts:{rid}", f"drop-runs:{rid}"]
-                problems += alerts.drop_problems(resort, result, season, today)
+        # Problems worth an alert: a resort failing for hours (any run); far fewer lifts/runs
+        # than usual (daily record only, so Hakuba's shorter afternoon page doesn't count).
+        live_now = _read_json(live_path).get("results", {})
+        for r in gres:
+            rid, result, season = r["id"], results[r["id"]], season_for(r)
+            if p := alerts.down_problem(r, live_now.get(rid), now_utc):
+                problems.append(p)
+            is_daily = bool(args.daily or args.only
+                            or daily_due(season, today_of[rid], local[rid].strftime("%H:%M"), daily_time, rid))
+            if result["ok"]:
+                checked.append(f"down:{rid}")
+                if is_daily:
+                    checked += [f"drop-lifts:{rid}", f"drop-runs:{rid}"]
+                    problems += alerts.drop_problems(r, result, season, today_of[rid])
+            if is_daily:  # 3. the resort's permanent record for today
+                store_result(season, today_of[rid], rid, result)
+                written.append(r)
     for p in problems:
         print(f"ALERT: {p['title']}")
 
-    # 3. Once a day: the permanent record, weather and season summary.
-    if write_daily:
-        entry = index["seasons"].setdefault(label, {})
-        entry["file"] = season_file(label)
-        summaries = entry.setdefault("summary", {})
-        for resort in resorts:
-            index["resorts"][resort["id"]] = {
-                "name": resort["name"],
-                "region": resort["region"],
-                "source_url": resort["url"],
-                **({"website": resort["website"]} if resort.get("website") else {}),
-                **({"map": resort["map"]} if resort.get("map") else {}),
-                # Night skiing per season (dates, hours, lifts), from resorts.yaml.
-                **({"night_skiing": {str(k): {kk: (vv if isinstance(vv, list) else str(vv)) for kk, vv in v.items()}
-                                     for k, v in resort["night_skiing"].items()}}
-                   if resort.get("night_skiing") else {}),
-                # Position and heights: the website uses them to fetch live temperatures.
-                **({"location": {"lat": resort["location"]["lat"], "lon": resort["location"]["lon"]},
-                    "elevation_m": {level: resort["elevation"][level] for level in LEVELS}}
-                   if has_location(resort) else {}),
-            }
-            store_result(season, today, resort["id"], results[resort["id"]])
-
-        # Temperatures (needs today's records to exist), then the season summaries.
-        update_weather(season, resorts, today)
-        for resort in resorts:
-            update_summary(summaries.setdefault(resort["id"], {}), season, resort["id"], results[resort["id"]])
-
-        entry["dates"] = [d["date"] for d in season["days"]]
-        # Keep resorts in the same order as resorts.yaml (the website lists them in this order).
-        order = [r["id"] for r in settings["resorts"]]
-        index["resorts"] = dict(sorted(index["resorts"].items(),
-                                       key=lambda kv: order.index(kv[0]) if kv[0] in order else len(order)))
-        index["seasons"] = dict(sorted(index["seasons"].items()))
-        index["last_updated"] = index["last_checked"] = now_jst().isoformat()
-        save_season(season)
+    # 4. Weather and season summaries for the resorts recorded today; save.
+    if written:
+        update_weather({r["id"]: season_for(r) for r in written}, written, today_of)
+        for r in written:
+            summaries = index["seasons"].setdefault(season_of(today_of[r["id"]]), {}).setdefault("summary", {})
+            update_summary(summaries.setdefault(r["id"], {}), season_for(r), r["id"], results[r["id"]])
+        for (g, label), season in seasons.items():
+            save_season(season, pattern=groups[g]["season_file"])
+            entry = index["seasons"].setdefault(label, {})
+            files = entry.setdefault("files", {})
+            files[g] = season_file(label, groups[g]["season_file"])
+            if g == "japan":
+                entry["file"] = files[g]  # older website versions read this
+            by_group = entry.setdefault("dates_by_group", {})
+            if "japan" not in by_group and entry.get("dates") and entry.get("file"):
+                by_group["japan"] = entry["dates"]  # older index: dates were Japan's
+            by_group[g] = [d["date"] for d in season["days"]]
+            entry["dates"] = sorted({d for ds in by_group.values() for d in ds})
+            print(f"Saved docs/data/{files[g]}")
+        refresh_resorts(index, every)
+        index["last_updated"] = index["last_checked"] = now_utc.isoformat()
         save_index(index)
-        print(f"Saved docs/data/{season_file(label)} and docs/data/lifts.json")
+        print("Saved docs/data/lifts.json")
 
     if args.alerts:
-        alerts.write_report(Path(args.alerts), problems, checked, now.isoformat())
-    print(f"{len(resorts) - failures} ok, {failures} failed")
+        alerts.write_report(Path(args.alerts), problems, checked, now_utc.isoformat())
+    print(f"{len(due) - failures} ok, {failures} failed")
     # Exit with an error only if nothing worked, so partial results still get committed.
-    return 1 if resorts and failures == len(resorts) else 0
+    return 1 if due and failures == len(due) else 0
+
+
+def refresh_resorts(index: dict, every: list[dict]) -> None:
+    """Resort details from resorts.yaml, in its order (the website lists them in this order)."""
+    for r in every:
+        if r.get("enabled", True) or r["id"] in index["resorts"]:
+            index["resorts"][r["id"]] = resort_info(r)
+    order = [r["id"] for r in every]
+    index["resorts"] = dict(sorted(index["resorts"].items(),
+                                   key=lambda kv: order.index(kv[0]) if kv[0] in order else len(order)))
+    index["seasons"] = dict(sorted(index["seasons"].items()))
+
+
+def off_season_or_night(index, resorts, groups, group_in_season, season_for, seasons, today_of, now_utc) -> int:
+    """No resort is due: it's night everywhere in season, or off-season. Finish the last
+    days' forecasts of groups whose season just ended, and (when every group is off-season)
+    save the monthly check-in."""
+    changed_files = False
+    for g, group in groups.items():
+        gres = [r for r in resorts if r["group"] == g]
+        if not gres or group_in_season(gres[0]):
+            continue
+        ids = {r["id"] for r in gres}
+        pending = [r for r in gres if has_pending_forecasts(season_for(r), today_of[r["id"]], ids)]
+        if pending:
+            changed = update_weather({r["id"]: season_for(r) for r in pending}, pending, today_of)
+            for r in pending:
+                if r["id"] in changed:
+                    summaries = index["seasons"].get(season_for(r)["season"], {}).get("summary", {})
+                    update_summary(summaries.setdefault(r["id"], {}), season_for(r), r["id"], None)
+            if changed:
+                for (gg, _), season in seasons.items():
+                    if gg == g:
+                        save_season(season, pattern=group["season_file"])
+                changed_files = True
+    if all(not group_in_season(r) for r in resorts):
+        if monthly_check_in(index, now_utc.isoformat()):
+            print("Off-season everywhere: no scraping. Saved this month's check-in (keeps the GitHub schedule active).")
+            changed_files = True
+        else:
+            print("Off-season everywhere: no scraping, and this month's check-in is already saved.")
+    else:
+        print("No resort is inside its scraping hours right now (local time).")
+    if changed_files:
+        save_index(index)
+    return 0
 
 
 if __name__ == "__main__":

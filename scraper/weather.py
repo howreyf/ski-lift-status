@@ -2,7 +2,7 @@
 
 Open-Meteo (https://open-meteo.com) is a free weather service (no key; non-commercial use;
 attribution required — see the website footer). One request covers every resort: for each
-resort we ask about two points (summit and base height).
+resort we ask about two points (summit and base height). Days are the resort's local days.
 
 What gets stored, per resort and day:
 
@@ -59,7 +59,8 @@ def fetch_weather(resorts: list[dict]) -> dict[str, dict[str, dict]]:
         "elevation": ",".join(str(r["elevation"][level]) for r, level in points),
         "daily": "temperature_2m_min,temperature_2m_max,temperature_2m_mean,snowfall_sum",
         "hourly": "snowfall",
-        "timezone": "Asia/Tokyo",
+        # Each point's own time zone, so "a day" is the resort's local day (as in the season files).
+        "timezone": "auto",
         "past_days": PAST_DAYS,
         "forecast_days": FORECAST_DAYS,
     }

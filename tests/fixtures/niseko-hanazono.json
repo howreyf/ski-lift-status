@@ -1,0 +1,48 @@
+{
+ "results": [
+  {
+   "id": 2767,
+   "object_id": "",
+   "name": "Hanazono Symphony Gondola",
+   "comment": "",
+   "status": "SUSPENDED",
+   "start_time": "8:30",
+   "end_time": "16:00",
+   "groomed": "なし",
+   "updateDate": "2026-11-24T08:51:58.000000Z"
+  },
+  {
+   "id": 1312,
+   "object_id": "TNHzhFEc6n2QgEnL",
+   "name": "Hanazono Lift#1",
+   "comment": "8:30～14:30, download 15:30",
+   "status": "OPERATION_SLOWED",
+   "start_time": "8:30",
+   "end_time": "15:30",
+   "groomed": "なし",
+   "updateDate": "2026-11-28T06:28:28.000000Z"
+  },
+  {
+   "id": 1313,
+   "object_id": "NNHlPPpK5JkYj4fb",
+   "name": "Hanazono 2",
+   "comment": "",
+   "status": "TODAY_CLOSED",
+   "start_time": "8:40",
+   "end_time": "15:00",
+   "groomed": "なし",
+   "updateDate": "2026-11-28T06:28:28.000000Z"
+  },
+  {
+   "id": 1314,
+   "object_id": "ZZkAc4Nm42D7tfKV",
+   "name": "Hanazono 3",
+   "comment": "",
+   "status": "TODAY_CLOSED",
+   "start_time": "8:40",
+   "end_time": "15:00",
+   "groomed": "なし",
+   "updateDate": "2026-11-28T06:28:28.000000Z"
+  }
+ ]
+}

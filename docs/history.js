@@ -15,7 +15,8 @@ const UNITS = ["season", "month", "week", "day"];
 const UNIT_LABEL = { season: "Season", month: "Month", week: "Week", day: "Day" };
 const MONTH_NAMES = ["january", "february", "march", "april", "may", "june", "july", "august",
   "september", "october", "november", "december"];
-const TYPE_ORDER = ["Ropeway", "Gondola", "Six", "Quad", "Triple", "Pair", "Single", "Magic carpet", "N/A"];
+const TYPE_ORDER = ["Train", "Ropeway", "Gondola", "Eight", "Six", "Quad", "Triple", "Pair", "Single", "Chairlift",
+  "Surface lift", "Magic carpet", "N/A"];
 
 let historyUI = null; // {id, unit, value, expanded: box key | null, view: "graph"|"day", day, bucket, graph}
 
@@ -35,8 +36,9 @@ function addDaysIso(iso, n) {
 function sundayOf(iso) {
   return addDaysIso(iso, -new Date(`${iso}T00:00:00Z`).getUTCDay());
 }
+/** Today in the visitor's own time zone (resorts are in many; close enough for "is it over"). */
 function todayIso() {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" });
+  return new Date().toLocaleDateString("en-CA");
 }
 function pad2(n) {
   return String(n).padStart(2, "0");
@@ -51,9 +53,14 @@ function seasonLabel(startYear) {
 function seasonStartYear(label) {
   return Number(label.slice(0, 4));
 }
+/** First and last season month over all groups (e.g. Europe's glaciers start in October). */
 function seasonMonthRange() {
-  const m = state.index?.season_months || { start: 11, end: 4 };
-  return [m.start, m.end];
+  const groups = Object.values(state.index?.groups || {}).map(g => g.season_months).filter(Boolean);
+  const all = groups.length ? groups : [state.index?.season_months || { start: 11, end: 4 }];
+  const order = m => (m >= 7 ? m - 7 : m + 5); // July = 0 ... June = 11
+  const start = all.map(m => m.start).sort((a, b) => order(a) - order(b))[0];
+  const end = all.map(m => m.end).sort((a, b) => order(b) - order(a))[0];
+  return [start, end];
 }
 /** "2026-27" -> ["2026-11", "2026-12", "2027-01", ...] (the season months) */
 function seasonMonths(label) {
@@ -496,9 +503,9 @@ function historyCells(id, recentlyViewed = false) {
   const info = state.index.resorts[id];
   const s = historyDir.stats[id] || {};
   const on = (x, n) => n ? `<span class="cell-note">on ${esc(shortDay(x.date))}</span>` : "";
-  const start = historyDir.unit ? periodRange(historyDir.unit, historyDir.value)[0] : state.latestDate;
+  const start = historyDir.unit ? periodRange(historyDir.unit, historyDir.value)[0] : latestDateOf(id);
   return `
-    <span class="cell cell-name">${recentlyViewed ? HISTORY_ICON : ""}${esc(info.name)}${nightIcon(nightSkiing(id, start))}<span class="cell-note">${esc(info.region)}</span>${sortNoteHtml(id)}</span>
+    <span class="cell cell-name">${recentlyViewed ? HISTORY_ICON : ""}${esc(info.name)}${nightIcon(nightSkiing(id, start))}<span class="cell-note">${esc(placeOf(id))}</span>${sortNoteHtml(id)}</span>
     <span class="cell" data-label="Peak lifts open">${s.lifts
       ? `<strong>${s.lifts.r.lifts_open}</strong> / ${s.lifts.r.lifts.length}${on(s.lifts, s.lifts.r.lifts_open)}` : NA}</span>
     <span class="cell" data-label="Peak runs open">${s.runs
@@ -618,9 +625,7 @@ async function renderHistoryDirectory() {
   html += resortGroupsHtml(historyRow, historySortValue, true);
   html += `</div>
     <p class="muted small legend">Peak lifts / runs open: the most open on any one day of the ${unitWord(unit)} (that day underneath).
-      Runs by grade: <span class="grade grade-green"></span> green <span class="grade grade-red"></span> red
-      <span class="grade grade-black"></span> black <span class="grade grade-orange"></span> expert
-      <span class="grade grade-other"></span> level not published.
+      ${gradeLegendHtml(shownIds(), "Runs by grade:")}
       Means: base temperature (from the daily means) and snow depth${unit === "season" ? `, over ${meanMonthsLabel()} (every recorded day until the season reaches ${meanMonthsLabel().slice(0, 3)})` : ""}.</p>`;
   view.innerHTML = html;
 
@@ -634,10 +639,7 @@ async function renderHistoryDirectory() {
   view.querySelectorAll("button[data-pin]").forEach(btn => btn.addEventListener("click", () => {
     if (pins.toggle(btn.dataset.pin)) renderHistoryDirectory();
   }));
-  view.querySelectorAll("details.region").forEach(d => d.addEventListener("toggle", () => {
-    const list = closedRegions().filter(r => r !== d.dataset.region);
-    writeList("closedRegions", d.open ? list : [...list, d.dataset.region]);
-  }));
+  rememberCountryToggles(view);
 }
 
 // ------------------------------------------------------------------ period statistics
@@ -693,7 +695,7 @@ function snowAmount(r, source) {
 }
 
 /** Status of a lift or run over a period: "28 Nov – present", "Opened on 5 Dec", ... */
-function periodStatus(days, unit, ongoing = false) {
+function periodStatus(days, unit, ongoing = false, latest = state.latestDate) {
   const open = days.filter(d => d.open);
   if (!days.length) return { cls: "unknown", text: NA };
   if (!open.length) {
@@ -702,7 +704,7 @@ function periodStatus(days, unit, ongoing = false) {
   }
   const firstRec = days[0].date, lastRec = days[days.length - 1].date;
   const first = open[0].date, last = open[open.length - 1].date;
-  const present = last === lastRec && lastRec === state.latestDate;
+  const present = last === lastRec && lastRec === latest; // `latest`: the resort's latest record
   const end = present ? "present" : shortDay(last);
   if (unit === "season") return { cls: present ? "open" : "partial", text: `${shortDay(first)} – ${end}` };
   // open at the start and the end of the period (gaps in between ignored) = open the whole period
@@ -1014,7 +1016,7 @@ function mountExpanded(id, recs, facts) {
 
 // ------------------------------------------------------------------ lists below the boxes
 
-function periodListsHtml(recs, unit, ongoing = false, ns = null) {
+function periodListsHtml(recs, unit, ongoing = false, ns = null, latest = state.latestDate) {
   const ok = recs.filter(x => x.r.ok);
   if (!ok.length) return "";
   const word = unitWord(unit);
@@ -1033,7 +1035,7 @@ function periodListsHtml(recs, unit, ongoing = false, ns = null) {
         <tbody>${lifts.map(({ item: l, days }) => `
           <tr>
             <td>${esc(l.name_en)}${isNightLift(ns, l) ? nightIcon(ns, "Night skiing lift") : ""}${l.name !== l.name_en ? `<span class="cell-note" lang="ja">${esc(l.name)}</span>` : ""}</td>
-            <td>${badge(periodStatus(days, unit, ongoing))}</td>
+            <td>${badge(periodStatus(days, unit, ongoing, latest))}</td>
             <td class="num">${esc(l.hours)}</td>
             <td>${typeIcon(l.lift_type)}</td>
           </tr>`).join("")}</tbody>
@@ -1049,7 +1051,7 @@ function periodListsHtml(recs, unit, ongoing = false, ns = null) {
         <tbody>${runs.map(({ item: x, days }) => `
           <tr>
             <td>${esc(x.name_en)}${x.name !== x.name_en ? `<span class="cell-note" lang="ja">${esc(x.name)}</span>` : ""}</td>
-            <td>${badge(periodStatus(days, unit, ongoing))}</td>
+            <td>${badge(periodStatus(days, unit, ongoing, latest))}</td>
             <td>${difficultyHtml(x.level)}</td>
           </tr>`).join("")}</tbody>
       </table>
@@ -1120,7 +1122,7 @@ async function renderHistoryPage(id, unit, value, carry = null) {
   } else {
     content = `
       <div class="boxes">${periodBoxes(id, recs, historyUI)}</div>
-      ${recs.length ? periodListsHtml(recs, unit, todayIso() <= end, nightSkiing(id, start)) : `<p class="muted">No data recorded in this period.</p>`}`;
+      ${recs.length ? periodListsHtml(recs, unit, todayIso() <= end, nightSkiing(id, start), latestDateOf(id)) : `<p class="muted">No data recorded in this period.</p>`}`;
   }
 
   view.innerHTML = `
@@ -1130,7 +1132,7 @@ async function renderHistoryPage(id, unit, value, carry = null) {
       <div>
         <h1 class="page-title">${esc(info.name)}${nightIcon(nightSkiing(id, start))} <span class="badge-historical">Historical</span></h1>
         <p class="resort-links small">
-          ${info.website ? `<a href="${esc(info.website)}" target="_blank" rel="noopener">Official website ↗</a> · ` : ""}${esc(info.region)}
+          ${info.website ? `<a href="${esc(info.website)}" target="_blank" rel="noopener">Official website ↗</a> · ` : ""}${esc(placeOf(id))}
         </p>
       </div>
       <div class="head-buttons">

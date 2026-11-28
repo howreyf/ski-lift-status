@@ -1,0 +1,147 @@
+{
+ "results": [
+  {
+   "id": 2444,
+   "object_id": "",
+   "name": "チャンピオンコース",
+   "comment": "",
+   "status": "OPEN",
+   "start_time": "",
+   "end_time": "",
+   "groomed": "あり",
+   "updateDate": "2026-02-13T07:43:16.000000Z"
+  },
+  {
+   "id": 2445,
+   "object_id": "",
+   "name": "ユートピアコース",
+   "comment": "",
+   "status": "OPEN",
+   "start_time": "",
+   "end_time": "",
+   "groomed": "あり",
+   "updateDate": "2026-02-13T07:43:16.000000Z"
+  },
+  {
+   "id": 2446,
+   "object_id": "",
+   "name": "パノラマコース",
+   "comment": "",
+   "status": "OPEN",
+   "start_time": "",
+   "end_time": "",
+   "groomed": "あり",
+   "updateDate": "2026-02-13T07:43:16.000000Z"
+  },
+  {
+   "id": 2447,
+   "object_id": "",
+   "name": "シルバーコース",
+   "comment": "",
+   "status": "OPEN",
+   "start_time": "",
+   "end_time": "",
+   "groomed": "なし",
+   "updateDate": "2026-02-13T07:43:16.000000Z"
+  },
+  {
+   "id": 2448,
+   "object_id": "",
+   "name": "S字コース",
+   "comment": "",
+   "status": "OPEN",
+   "start_time": "",
+   "end_time": "",
+   "groomed": "なし",
+   "updateDate": "2026-02-13T07:43:16.000000Z"
+  },
+  {
+   "id": 2449,
+   "object_id": "",
+   "name": "白樺コース",
+   "comment": "",
+   "status": "OPEN",
+   "start_time": "",
+   "end_time": "",
+   "groomed": "あり",
+   "updateDate": "2026-02-13T07:43:16.000000Z"
+  },
+  {
+   "id": 2450,
+   "object_id": "",
+   "name": "ファミリーコース",
+   "comment": "",
+   "status": "OPEN",
+   "start_time": "",
+   "end_time": "",
+   "groomed": "あり",
+   "updateDate": "2026-02-13T07:43:16.000000Z"
+  },
+  {
+   "id": 2451,
+   "object_id": "",
+   "name": "パラダイスコース",
+   "comment": "",
+   "status": "OPEN",
+   "start_time": "",
+   "end_time": "",
+   "groomed": "なし",
+   "updateDate": "2026-02-13T07:43:16.000000Z"
+  },
+  {
+   "id": 2452,
+   "object_id": "",
+   "name": "メルヘンコース",
+   "comment": "",
+   "status": "OPEN",
+   "start_time": "",
+   "end_time": "",
+   "groomed": "なし",
+   "updateDate": "2026-02-13T07:43:16.000000Z"
+  },
+  {
+   "id": 2453,
+   "object_id": "",
+   "name": "ジュニアコース",
+   "comment": "",
+   "status": "OPEN",
+   "start_time": "",
+   "end_time": "",
+   "groomed": "あり",
+   "updateDate": "2026-02-13T07:43:16.000000Z"
+  },
+  {
+   "id": 2454,
+   "object_id": "",
+   "name": "チャレンジコース",
+   "comment": "",
+   "status": "OPEN",
+   "start_time": "",
+   "end_time": "",
+   "groomed": "なし",
+   "updateDate": "2026-02-13T07:43:16.000000Z"
+  },
+  {
+   "id": 2455,
+   "object_id": "",
+   "name": "深雪林間コース",
+   "comment": "",
+   "status": "CLOSED",
+   "start_time": "",
+   "end_time": "",
+   "groomed": "なし",
+   "updateDate": "2026-04-05T08:34:53.000000Z"
+  },
+  {
+   "id": 2456,
+   "object_id": "",
+   "name": "ダイナミックコース",
+   "comment": "",
+   "status": "OPEN",
+   "start_time": "",
+   "end_time": "",
+   "groomed": "あり",
+   "updateDate": "2026-02-13T07:43:16.000000Z"
+  }
+ ]
+}

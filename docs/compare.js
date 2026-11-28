@@ -239,10 +239,12 @@ function seriesColor(i) {
   return (dark ? SERIES_DARK : SERIES_LIGHT)[i % 8];
 }
 
+/** Resorts grouped by country in the dropdown. */
 function resortOptions(selected) {
   let html = "";
-  for (const [region, ids] of regions()) {
-    html += `<optgroup label="${esc(region)}">${ids.map(id =>
+  for (const [country, regionsOf] of countries()) {
+    const ids = [...regionsOf.values()].flat();
+    html += `<optgroup label="${esc(country)}">${ids.map(id =>
       `<option value="${esc(id)}"${id === selected ? " selected" : ""}>${esc(state.index.resorts[id].name)}</option>`).join("")}</optgroup>`;
   }
   return html;
@@ -489,7 +491,7 @@ function sectionCell(key, d) {
     return `<div class="cmp-big">${opened} <small>/ ${items.length} opened</small></div>
       <div class="muted small">${liftTypeTotalsHtml(items.map(x => x.item))}</div>
       <ul class="cmp-list">${items.map(({ item: l, days }) => {
-        const st = periodStatus(days, c.unit, ongoing);
+        const st = periodStatus(days, c.unit, ongoing, latestDateOf(c.id));
         return `<li><span>${esc(l.name_en)}${isNightLift(ns, l) ? nightIcon(ns, "Night skiing lift") : ""}</span><span class="badge s-${st.cls === "partial" ? "partial" : st.cls}">${esc(st.text)}</span></li>`;
       }).join("")}</ul>`;
   }
@@ -506,7 +508,7 @@ function sectionCell(key, d) {
     return `<div class="cmp-big">${openedNames.size} <small>/ ${runs.length} opened</small></div>
       <div>${gradeCirclesHtml(runs, g => runs.filter(r => gradeOf(r.level) === g && openedNames.has(r.name)).length, `opened this ${word}`)}</div>
       <ul class="cmp-list">${items.map(({ item: x, days }) => {
-        const st = periodStatus(days, c.unit, ongoing);
+        const st = periodStatus(days, c.unit, ongoing, latestDateOf(c.id));
         return `<li><span>${esc(x.name_en)}</span><span class="badge s-${st.cls === "partial" ? "partial" : st.cls}">${esc(st.text)}</span></li>`;
       }).join("")}</ul>`;
   }

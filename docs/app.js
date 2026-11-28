@@ -6,8 +6,10 @@
 //   #/resort/<id>      One resort: boxes (lifts, runs, snow, temperatures), lifts and runs, trail map
 //   #/resort/<id>/<date>  The same resort on a past day (historical record)
 //
-// Data: data/lifts.json (index) + data/seasons/<season>.json (daily records).
-// Live temperatures come straight from Open-Meteo in the visitor's browser.
+// Data: data/lifts.json (index: groups, resorts, season summaries). Each group (Japan, Europe,
+// North America) has its own files, listed in the index: a live file (latest lift/run status)
+// and one file per season (daily records). Each resort records on its own LOCAL day, so the
+// "latest day" is per resort. Live temperatures come straight from Open-Meteo in the visitor's browser.
 // Pins and recently viewed resorts are saved in the visitor's browser (localStorage).
 
 "use strict";
@@ -17,19 +19,24 @@ const MAX_PINS = 5;
 const MAX_SUGGESTIONS = 3;
 const MAX_RECENT = 10;
 const LIVE_REFRESH_MS = 15 * 60 * 1000; // Open-Meteo updates "current" values every 15 minutes
-const STATUS_REFRESH_MS = 5 * 60 * 1000; // re-check data/live.json (the scraper updates it every 45 minutes)
+const STATUS_REFRESH_MS = 5 * 60 * 1000; // re-check the live files (the scraper updates them every 45 minutes)
 
 const STATUS_LABEL = { open: "Open", hold: "On hold", closed: "Closed", unknown: "Unknown" };
 const RUN_STATUS_LABEL = { open: "Open", partial: "Partly open", closed: "Closed", unknown: "Unknown" };
 
-// Run grades for Japanese resorts: green / red / black, orange for expert.
-// Runs labelled with two levels (e.g. "Intermediate/Advanced") count under the harder one.
+// Run grades. Japan: green / red / black, orange for expert. Europe: blue / red / black.
+// North America: green circle, blue square (double blue counts as blue), black diamond,
+// double black diamond, terrain park. Runs labelled with two Japanese levels
+// (e.g. "Intermediate/Advanced") count under the harder one. `word` is the short name.
 const GRADES = [
-  { key: "green", label: "Green (beginner)", levels: ["First timer", "Beginner"] },
-  { key: "red", label: "Red (intermediate)", levels: ["Intermediate", "Beginner/Intermediate"] },
-  { key: "black", label: "Black (advanced)", levels: ["Advanced", "Intermediate/Advanced"] },
-  { key: "orange", label: "Orange (expert)", levels: ["Expert"] },
-  { key: "other", label: "Level not published", levels: [] },
+  { key: "green", word: "green", label: "Green (beginner)", levels: ["First timer", "Beginner", "Green", "Green circle"] },
+  { key: "blue", word: "blue", label: "Blue (easy / intermediate)", levels: ["Blue", "Blue square", "Double blue square"] },
+  { key: "red", word: "red", label: "Red (intermediate)", levels: ["Intermediate", "Beginner/Intermediate", "Red"] },
+  { key: "black", word: "black", label: "Black (advanced)", levels: ["Advanced", "Intermediate/Advanced", "Black", "Black diamond"] },
+  { key: "double", word: "double black", label: "Double black (expert)", levels: ["Double black diamond"] },
+  { key: "orange", word: "expert", label: "Orange (expert)", levels: ["Expert"] },
+  { key: "park", word: "park", label: "Terrain park", levels: ["Terrain park"] },
+  { key: "other", word: "level not published", label: "Level not published", levels: [] },
 ];
 
 const view = document.getElementById("view");
@@ -37,9 +44,10 @@ const toastEl = document.getElementById("toast");
 
 const state = {
   index: null,        // data/lifts.json
-  latestDate: null,   // newest date with data
-  latestDay: null,    // that day's record: {date, results: {id: {...}}}
-  liveStatus: null,   // data/live.json: latest lift/run status {date, updated, results}
+  latestDate: null,   // newest date with data (any resort)
+  latestDay: null,    // each resort's latest record: {date, results: {id: {...}}}
+  latestDates: {},    // id -> date of that resort's latest record (its local day)
+  liveStatus: null,   // all groups' live files merged: {updated, results: {id: {..., date, changed}}}
   live: {},           // {id: {summit: {temp, time}, base: {temp, time}}}
   seasons: new Map(), // season label -> Promise of season file
 };
@@ -61,17 +69,40 @@ function deg(v) {
   return Number(v).toFixed(1);
 }
 
-function formatJst(iso) {
+/** The resort's time zone (Japan for resorts from before time zones were recorded). */
+function tzOf(id) {
+  return state.index?.resorts[id]?.timezone || "Asia/Tokyo";
+}
+
+/** "28 Nov 2026, 14:30 CET" in the given time zone (the resort's own). */
+function formatLocal(iso, tz = "Asia/Tokyo") {
   if (!iso) return NA;
   const d = new Date(iso);
-  const date = d.toLocaleDateString("en-GB", { timeZone: "Asia/Tokyo", day: "numeric", month: "short", year: "numeric" });
-  const time = d.toLocaleTimeString("en-GB", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit" });
-  return `${date}, ${time} JST`;
+  if (Number.isNaN(d.getTime())) return NA;
+  const date = d.toLocaleDateString("en-GB", { timeZone: tz, day: "numeric", month: "short", year: "numeric" });
+  return `${date}, ${timeLocal(iso, tz)}`;
+}
+
+/** "14:30 CET" */
+function timeLocal(iso, tz = "Asia/Tokyo") {
+  const d = new Date(iso);
+  const time = d.toLocaleTimeString("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit" });
+  return `${time} ${zoneName(d, tz)}`;
+}
+
+/** Short zone name: JST, CET, MST, PST... (browsers say "GMT+1" for some; keep what they say). */
+function zoneName(d, tz) {
+  const named = { "Asia/Tokyo": "JST" };
+  if (named[tz]) return named[tz];
+  const part = new Intl.DateTimeFormat("en-US", { timeZone: tz, timeZoneName: "short" })
+    .formatToParts(d).find(p => p.type === "timeZoneName");
+  const euro = { "GMT+1": "CET", "GMT+2": "CEST" };
+  return euro[part?.value] || part?.value || tz;
 }
 
 function formatDay(day) {
-  const d = new Date(`${day}T12:00:00+09:00`);
-  return d.toLocaleDateString("en-GB", { timeZone: "Asia/Tokyo", weekday: "short", day: "numeric", month: "short", year: "numeric" });
+  const d = new Date(`${day}T12:00:00Z`);
+  return d.toLocaleDateString("en-GB", { timeZone: "UTC", weekday: "short", day: "numeric", month: "short", year: "numeric" });
 }
 
 function seasonOf(day) {
@@ -124,13 +155,32 @@ const recent = {
 
 // ------------------------------------------------------------------ data
 
+/** The season's files, one per group: {japan: "seasons/2026-27.json", europe: ...}. */
+function seasonFiles(label) {
+  const s = state.index.seasons[label];
+  return s?.files || (s?.file ? { japan: s.file } : {});
+}
+
+/** One season: every group's file, merged into one list of days {date, results} (a group
+ *  that has no file yet, or fails to load, is left out). */
 function loadSeason(label) {
   if (!state.seasons.has(label)) {
-    const file = state.index.seasons[label]?.file;
-    const p = fetch(`data/${file}`, { cache: "no-cache" }).then(r => {
+    const files = Object.values(seasonFiles(label));
+    const p = Promise.all(files.map(file => fetch(`data/${file}`, { cache: "no-cache" }).then(r => {
       if (!r.ok) throw new Error(`HTTP ${r.status} for ${file}`);
       return r.json();
-    });
+    }).catch(err => (files.length === 1 ? Promise.reject(err) : { days: [] }))))
+      .then(parts => {
+        const byDate = new Map();
+        for (const part of parts) {
+          for (const d of part.days || []) {
+            const day = byDate.get(d.date) || { date: d.date, results: {} };
+            Object.assign(day.results, d.results);
+            byDate.set(d.date, day);
+          }
+        }
+        return { season: label, days: [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)) };
+      });
     p.catch(() => state.seasons.delete(label));
     state.seasons.set(label, p);
   }
@@ -141,11 +191,36 @@ function resortIds() {
   return Object.keys(state.index.resorts);
 }
 
-/** Resorts grouped by region, in the order of the data file. */
+function countryOf(id) {
+  return state.index.resorts[id]?.country || "Japan";
+}
+
+/** "Hokkaido", or "Montana, USA" for resorts outside Japan. */
+function placeOf(id) {
+  const info = state.index.resorts[id];
+  const country = countryOf(id);
+  return country === "Japan" ? info.region : `${info.region}, ${country}`;
+}
+
+/** Resorts grouped by country, then region, in the order of the data file:
+ *  Map(country -> Map(region -> [ids])). */
+function countries() {
+  const map = new Map();
+  for (const id of resortIds()) {
+    const country = countryOf(id), region = state.index.resorts[id].region;
+    if (!map.has(country)) map.set(country, new Map());
+    const regionsOf = map.get(country);
+    if (!regionsOf.has(region)) regionsOf.set(region, []);
+    regionsOf.get(region).push(id);
+  }
+  return map;
+}
+
+/** Resorts grouped by region ("Hokkaido", "Montana, USA"), in the order of the data file. */
 function regions() {
   const map = new Map();
   for (const id of resortIds()) {
-    const region = state.index.resorts[id].region;
+    const region = placeOf(id);
     if (!map.has(region)) map.set(region, []);
     map.get(region).push(id);
   }
@@ -156,12 +231,18 @@ function todayResult(id) {
   return state.latestDay?.results?.[id];
 }
 
-/** Latest lift/run status for a resort from live.json (if it's from today or newer). */
+/** The resort's latest recorded day (its local date). */
+function latestDateOf(id) {
+  return state.latestDates[id] || state.latestDate;
+}
+
+/** Latest lift/run status for a resort from its group's live file (if it's from the
+ *  resort's latest day or newer). */
 function liveStatusFor(id) {
-  const ls = state.liveStatus;
-  if (!ls || (state.latestDate && ls.date < state.latestDate)) return null;
-  const e = ls.results?.[id];
-  return e?.ok ? e : null;
+  const e = state.liveStatus?.results?.[id];
+  const latest = latestDateOf(id);
+  if (!e || (latest && e.date && e.date < latest)) return null;
+  return e.ok ? e : null;
 }
 
 /** The latest picture of a resort: lift and run status from live.json (every 45 min),
@@ -180,17 +261,32 @@ function currentResult(id) {
   };
 }
 
-/** "Lift & run status: last change 14:30 JST" */
-function statusTimeHtml() {
+function scheduleText() {
+  const [from, to] = state.index.schedule?.hours || ["09:00", "21:00"];
+  return `${from}–${to}`;
+}
+
+/** Resort page: "Lift & run status: last change 14:30 CET (checked every 45 min, 09:00–21:00
+ *  local time)". Tables (no id): when anything last changed, in the visitor's own time. */
+function statusTimeHtml(id = null) {
   const ls = state.liveStatus;
+  if (id) {
+    const e = ls?.results?.[id];
+    const when = e?.changed || ls?.updated;
+    if (!when) return "";
+    const tz = tzOf(id);
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: tz });
+    const day = e?.date && e.date !== today ? ` ${formatDay(e.date)}` : "";
+    return `Lift &amp; run status: last change <strong>${esc(timeLocal(when, tz))}${esc(day)}</strong> (checked every 45 min, ${scheduleText()} local time)`;
+  }
   if (!ls?.updated) return "";
-  const time = new Date(ls.updated).toLocaleTimeString("en-GB", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit" });
-  const day = ls.date !== new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" }) ? ` ${formatDay(ls.date)}` : "";
-  return `Lift &amp; run status: last change <strong>${esc(time)} JST${esc(day)}</strong> (checked every 45 min, 09:08–21:08)`;
+  const time = new Date(ls.updated).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  return `Lift &amp; run status: last change <strong>${esc(time)}</strong> your time (each resort is checked every 45 min, ${scheduleText()} its local time)`;
 }
 
 function seasonSummary(id) {
-  return state.index.seasons[seasonOf(state.latestDate)]?.summary?.[id] || {};
+  const latest = latestDateOf(id);
+  return latest ? state.index.seasons[seasonOf(latest)]?.summary?.[id] || {} : {};
 }
 
 // ------------------------------------------------------------------ live temperatures (Open-Meteo)
@@ -208,7 +304,7 @@ async function fetchLive() {
     longitude: points.map(p => p.info.location.lon).join(","),
     elevation: points.map(p => p.info.elevation_m[p.level]).join(","),
     current: "temperature_2m,snowfall,weather_code",
-    timezone: "Asia/Tokyo",
+    timezone: "GMT", // times in UTC (resorts are in many time zones)
   });
   try {
     const resp = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
@@ -231,10 +327,10 @@ async function fetchLive() {
   refreshLiveBoxes();
 }
 
-/** "(12 min ago)" for a live reading. Open-Meteo gives Japan time without a zone, e.g.
- *  "2026-11-27T15:15" (the 15-minute slot the value is for). Updated every minute by tickAgo(). */
-function agoText(jstTime) {
-  const t = Date.parse(`${jstTime}:00+09:00`);
+/** "(12 min ago)" for a live reading. Open-Meteo gives UTC without a zone, e.g.
+ *  "2026-11-27T06:15" (the 15-minute slot the value is for). Updated every minute by tickAgo(). */
+function agoText(utcTime) {
+  const t = Date.parse(`${utcTime}:00Z`);
   if (Number.isNaN(t)) return "";
   const min = Math.max(0, Math.round((Date.now() - t) / 60000));
   if (min < 1) return "(just now)";
@@ -243,9 +339,10 @@ function agoText(jstTime) {
   return `(${h} h${m ? ` ${m} min` : ""} ago)`;
 }
 
-function agoHtml(jstTime) {
-  if (!jstTime) return "";
-  return `<span class="ago" data-time="${esc(jstTime)}" title="Updated ${esc(jstTime.replace("T", " "))} JST">${agoText(jstTime)}</span>`;
+function agoHtml(utcTime) {
+  if (!utcTime) return "";
+  const shown = new Date(`${utcTime}:00Z`).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+  return `<span class="ago" data-time="${esc(utcTime)}" title="Updated ${esc(shown)} (your time)">${agoText(utcTime)}</span>`;
 }
 
 function tickAgo() {
@@ -338,7 +435,7 @@ function staleHtml(id, long = false) {
   const since = failingSince(id);
   if (!since) return "";
   const shown = !!liveStatusFor(id) || !!todayResult(id)?.ok;
-  const text = `Couldn't reach the resort's status page since ${formatJst(since)}`;
+  const text = `Couldn't reach the resort's status page since ${formatLocal(since, tzOf(id))}`;
   return long
     ? `<div class="stale-note" role="note">${ALERT_ICON}<span>${esc(text)} (it's checked every 45 min).${
         shown ? " The lift and run status below is the last one we got, so it may be out of date." : ""}</span></div>`
@@ -373,7 +470,7 @@ function resortCells(id, recentlyViewed = false) {
   const info = state.index.resorts[id];
   const r = currentResult(id);
   return `
-    <span class="cell cell-name">${recentlyViewed ? HISTORY_ICON : ""}${esc(info.name)}${nightIcon(nightSkiing(id, state.latestDate))}<span class="cell-note">${esc(info.region)}</span>${sortNoteHtml(id)}</span>
+    <span class="cell cell-name">${recentlyViewed ? HISTORY_ICON : ""}${esc(info.name)}${nightIcon(nightSkiing(id, latestDateOf(id)))}<span class="cell-note">${esc(placeOf(id))}</span>${sortNoteHtml(id)}</span>
     <span class="cell" data-label="Lifts open">${liftsHtml(id, r)}${staleHtml(id)}</span>
     <span class="cell" data-label="Runs open">${runsHtml(r)}</span>
     <span class="cell" data-label="Base temp" data-base-temp="${esc(id)}">${baseTempHtml(id)}</span>
@@ -419,6 +516,7 @@ function matchScore(id, query) {
   if (tokens.every(t => words.some(w => w.startsWith(t)))) return 2;      // "hap" -> Happo-one
   if (name.replace(/ /g, "").includes(q.replace(/ /g, ""))) return 1;     // inside a word
   if (normalize(info.region).startsWith(q)) return 0.5;                   // "nagano"
+  if (normalize(countryOf(id)).startsWith(q)) return 0.4;                 // "italy"
   return -1;
 }
 
@@ -521,18 +619,42 @@ function updatedLine() {
   return status || note ? `<p class="muted small updated">${status}${note}</p>` : "";
 }
 
+/** "Off-season" note when no group is in season (each group has its own months). */
 function seasonNoteHtml() {
-  const m = state.index.season_months;
-  if (!m) return "";
-  const now = Number(new Date().toLocaleString("en-GB", { timeZone: "Asia/Tokyo", month: "numeric" }));
-  const inSeason = m.start <= m.end ? now >= m.start && now <= m.end : now >= m.start || now <= m.end;
-  if (inSeason) return "";
+  const groups = Object.values(state.index.groups || {}).map(g => g.season_months).filter(Boolean);
+  const months = groups.length ? groups : state.index.season_months ? [state.index.season_months] : [];
+  if (!months.length) return "";
+  const now = new Date().getMonth() + 1;
+  const inSeason = m => (m.start <= m.end ? now >= m.start && now <= m.end : now >= m.start || now <= m.end);
+  if (months.some(inSeason)) return "";
   const name = n => new Date(2000, n - 1, 1).toLocaleString("en-GB", { month: "long" });
-  return `<span class="season-note">Off-season: lift status is collected ${name(m.start)}–${name(m.end)}. Showing the last day recorded.</span>`;
+  const [first] = months;
+  return `<span class="season-note">Off-season: lift status is collected ${name(first.start)}–${name(first.end)}. Showing the last day recorded.</span>`;
 }
 
-function closedRegions() {
-  return readList("closedRegions");
+/** Country dropdowns the visitor closed (kept in the browser). */
+function closedCountries() {
+  return readList("closedCountries");
+}
+
+/** Remember open/closed country dropdowns. */
+function rememberCountryToggles(root) {
+  root.querySelectorAll("details.country").forEach(d => d.addEventListener("toggle", () => {
+    const list = closedCountries().filter(c => c !== d.dataset.country);
+    writeList("closedCountries", d.open ? list : [...list, d.dataset.country]);
+  }));
+}
+
+/** "Runs open by grade: (green) green (blue) blue ..." for the grades the listed resorts use. */
+function gradeLegendHtml(ids, intro = "Runs open by grade:") {
+  const used = new Set();
+  for (const id of ids) {
+    const runs = todayResult(id)?.runs || liveStatusFor(id)?.runs || [];
+    for (const g of runsByGrade(runs)) used.add(g.grade.key);
+  }
+  if (!used.size) ["green", "red", "black", "orange", "other"].forEach(k => used.add(k));
+  return `${intro} ${GRADES.filter(g => used.has(g.key)).map(g =>
+    `<span class="grade grade-${g.key}"></span> ${esc(g.word)}`).join(" ")}.`;
 }
 
 /** Home: the big "Ski Status" title over contour lines, a way to the resorts, and the
@@ -575,13 +697,7 @@ function renderResorts() {
       ${TABLE_HEAD}
       ${resortGroupsHtml(resortRow, presentSortValue, false)}`;
   html += `</div>
-    <p class="muted small legend">Runs open by grade:
-      <span class="grade grade-green"></span> green
-      <span class="grade grade-red"></span> red
-      <span class="grade grade-black"></span> black
-      <span class="grade grade-orange"></span> expert
-      <span class="grade grade-other"></span> level not published.
-      Partly open runs count as open.</p>`;
+    <p class="muted small legend">${gradeLegendHtml(shownIds())} Partly open runs count as open.</p>`;
   view.innerHTML = html;
   setupSearch(view);
   setupSort(view, renderResorts);
@@ -589,10 +705,7 @@ function renderResorts() {
   view.querySelectorAll("button[data-pin]").forEach(btn => btn.addEventListener("click", () => {
     if (pins.toggle(btn.dataset.pin)) renderResorts();
   }));
-  view.querySelectorAll("details.region").forEach(d => d.addEventListener("toggle", () => {
-    const list = closedRegions().filter(r => r !== d.dataset.region);
-    writeList("closedRegions", d.open ? list : [...list, d.dataset.region]);
-  }));
+  rememberCountryToggles(view);
 }
 
 // ------------------------------------------------------------------ resort page
@@ -601,11 +714,16 @@ function renderResorts() {
 let currentPage = null; // {id, date, result, isLatest}
 
 const SNOW_CODES = [71, 73, 75, 77, 85, 86]; // Open-Meteo weather codes for snow
-const TYPE_LABEL = { Gondola: "Gondola", Ropeway: "Ropeway", "Magic carpet": "Magic carpet",
-  Single: "Single chair", Pair: "Pair chair", Triple: "Triple chair", Quad: "Quad chair", Six: "Six chair" };
-const SEATS = { Single: 1, Pair: 2, Triple: 3, Quad: 4, Six: 6 };
+const TYPE_LABEL = { Gondola: "Gondola", Ropeway: "Ropeway (cable car)", "Magic carpet": "Magic carpet",
+  Single: "Single chair", Pair: "Pair chair", Triple: "Triple chair", Quad: "Quad chair", Six: "Six chair",
+  Eight: "Eight chair", Chairlift: "Chairlift", "Surface lift": "Drag lift", Train: "Train" };
+const SEATS = { Single: 1, Pair: 2, Triple: 3, Quad: 4, Six: 6, Eight: 8 };
+// Dots shown beside a run's difficulty (two levels = two dots).
 const LEVEL_GRADE = { "First timer": ["green"], Beginner: ["green"], Intermediate: ["red"], Advanced: ["black"],
-  Expert: ["orange"], "Beginner/Intermediate": ["green", "red"], "Intermediate/Advanced": ["red", "black"] };
+  Expert: ["orange"], "Beginner/Intermediate": ["green", "red"], "Intermediate/Advanced": ["red", "black"],
+  Green: ["green"], Blue: ["blue"], Red: ["red"], Black: ["black"],
+  "Green circle": ["green"], "Blue square": ["blue"], "Double blue square": ["blue", "blue"],
+  "Black diamond": ["black"], "Double black diamond": ["black", "black"], "Terrain park": ["park"] };
 
 function pct(part, whole) {
   if (part == null || !whole) return null;
@@ -641,7 +759,7 @@ function scale({ lo, hi, value, fillFrom = null, tick = null, loLabel, hiLabel, 
 
 function liftsBox(id, r, more = "") {
   if (!r?.ok) return box("lifts", "Lifts open", `<div class="box-value">${NA}</div>`);
-  const total = (r.date === state.latestDate ? seasonSummary(id).lifts_total : null) ?? r.lifts.length;
+  const total = (r.date === latestDateOf(id) ? seasonSummary(id).lifts_total : null) ?? r.lifts.length;
   const p = pct(r.lifts_open, total);
   return box("lifts", "Lifts open",
     `<div class="box-value">${r.lifts_open} <small>/ ${total}</small></div>
@@ -697,7 +815,7 @@ function outlookText(o) {
   if (!o) return "";
   if (o.date == null) return `No snow in the ${o.within_days}-day forecast`;
   if (o.days === 0) return `Snow expected today (~${o.cm} cm)`;
-  const when = new Date(`${o.date}T12:00:00+09:00`).toLocaleDateString("en-GB", { timeZone: "Asia/Tokyo", weekday: "short", day: "numeric", month: "short" });
+  const when = new Date(`${o.date}T12:00:00Z`).toLocaleDateString("en-GB", { timeZone: "UTC", weekday: "short", day: "numeric", month: "short" });
   return `Next snow in ${o.days} day${o.days === 1 ? "" : "s"} (${when}, ~${o.cm} cm)`;
 }
 
@@ -794,15 +912,23 @@ function typeIcon(type, compact = false) {
   } else if (type === "Magic carpet") {
     svg = `<path d="M3 18l18-6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
       <circle cx="12" cy="7" r="2" fill="currentColor"/><path d="M12 9v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>`;
-  } else if (seats) {
+  } else if (seats || type === "Chairlift") {
     svg = `<path d="M12 2v6" stroke="currentColor" stroke-width="1.6"/><path d="M7 8h10v6H7z" fill="none" stroke="currentColor" stroke-width="1.6"/>
       <path d="M6 14h12l-1 4H7z" fill="currentColor"/><path d="M7 18v3M17 18v3" stroke="currentColor" stroke-width="1.6"/>`;
+  } else if (type === "Surface lift") {
+    svg = `<path d="M3 4l18 14" stroke="currentColor" stroke-width="1.6"/><path d="M11 10v6M8 16h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      <circle cx="16" cy="13" r="1.8" fill="currentColor"/><path d="M16 15v4l-2 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/>`;
+  } else if (type === "Train") {
+    svg = `<rect x="6" y="3" width="12" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6 10h12" stroke="currentColor" stroke-width="1.6"/>
+      <circle cx="9.5" cy="13" r="1" fill="currentColor"/><circle cx="14.5" cy="13" r="1" fill="currentColor"/><path d="M8 16l-2 5M16 16l2 5M5 21h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>`;
   } else {
     return `<span class="muted">${NA}</span>`;
   }
   return `<span class="type${compact ? " type-compact" : ""}"${compact ? ` title="${esc(TYPE_LABEL[type] || type)}"` : ""}><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">${svg}</svg>${
     seats ? `<span class="seats" title="${seats}-seat">${seats}</span>` : ""}${compact ? "" : `<span>${esc(TYPE_LABEL[type] || type)}</span>`}</span>`;
 }
+
+const JAPANESE_RE = /[\u3040-\u30ff\u4e00-\u9fff]/;
 
 function difficultyHtml(level) {
   const grades = LEVEL_GRADE[level];
@@ -820,7 +946,7 @@ function liftsTable(lifts, startOpen = false, ns = null) {
         <thead><tr><th>Lift</th><th>Status</th><th>Operating hours</th><th>Type</th></tr></thead>
         <tbody>${lifts.map(l => `
           <tr>
-            <td>${esc(l.name_en)}${isNightLift(ns, l) ? nightIcon(ns, "Night skiing lift") : ""}${l.name !== l.name_en ? `<span class="cell-note" lang="ja">${esc(l.name)}</span>` : ""}</td>
+            <td>${esc(l.name_en)}${isNightLift(ns, l) ? nightIcon(ns, "Night skiing lift") : ""}${l.name !== l.name_en ? `<span class="cell-note"${JAPANESE_RE.test(l.name) ? ' lang="ja"' : ""}>${esc(l.name)}</span>` : ""}</td>
             <td><span class="badge s-${esc(l.status)}" title="Resort's wording: ${esc(l.raw)}">${esc(STATUS_LABEL[l.status])}</span></td>
             <td class="num">${esc(l.hours)}</td>
             <td>${typeIcon(l.lift_type)}</td>
@@ -841,7 +967,7 @@ function runsTable(runs, startOpen = false, liftsOpen = null) {
         <thead><tr><th>Run</th><th>Status</th><th>Difficulty</th></tr></thead>
         <tbody>${runs.map(x => `
           <tr>
-            <td>${esc(x.name_en)}${x.name !== x.name_en ? `<span class="cell-note" lang="ja">${esc(x.name)}</span>` : ""}</td>
+            <td>${esc(x.name_en)}${x.name !== x.name_en ? `<span class="cell-note"${JAPANESE_RE.test(x.name) ? ' lang="ja"' : ""}>${esc(x.name)}</span>` : ""}</td>
             <td><span class="badge s-${esc(x.status)}" title="Resort's wording: ${esc(x.raw)}">${esc(RUN_STATUS_LABEL[x.status])}</span></td>
             <td>${difficultyHtml(x.level)}</td>
           </tr>`).join("")}</tbody>
@@ -880,8 +1006,8 @@ async function renderResortPage(id, date) {
     return;
   }
   recent.add(id);
-  date = date || state.latestDate;
-  const isLatest = date === state.latestDate;
+  date = date || latestDateOf(id);
+  const isLatest = date === latestDateOf(id);
   let day = state.latestDay;
   if (!isLatest) {
     try {
@@ -902,7 +1028,7 @@ async function renderResortPage(id, date) {
         <h1 class="page-title">${esc(info.name)}${nightIcon(nightSkiing(id, date))}</h1>
         <p class="resort-links small">
           ${info.website ? `<a href="${esc(info.website)}" target="_blank" rel="noopener">Official website ↗</a> · ` : ""}
-          <a href="${esc(info.source_url)}" target="_blank" rel="noopener">Lift status page ↗</a> · ${esc(info.region)}
+          <a href="${esc(info.source_url)}" target="_blank" rel="noopener">Lift status page ↗</a> · ${esc(placeOf(id))}
         </p>
       </div>
       <div class="head-buttons">
@@ -912,8 +1038,8 @@ async function renderResortPage(id, date) {
       </div>
     </div>
     <p class="muted small date-line">${[
-      isLatest ? (r?.liveStatus ? statusTimeHtml() : "") : `Historical record: <strong>${esc(formatDay(date))}</strong>`,
-      r?.source_updated ? `resort last updated ${esc(formatJst(r.source_updated))}` : "",
+      isLatest ? (r?.liveStatus ? statusTimeHtml(id) : "") : `Historical record: <strong>${esc(formatDay(date))}</strong>`,
+      r?.source_updated ? `resort last updated ${esc(formatLocal(r.source_updated, tzOf(id)))}` : "",
     ].filter(Boolean).join(" · ")}</p>
 
     ${isLatest ? staleHtml(id, true) : ""}
@@ -973,18 +1099,34 @@ function route(scrollTop = true) {
   if (scrollTop) window.scrollTo(0, 0);
 }
 
-/** Fetch data/live.json; if it changed, redraw the page (unless the visitor is typing a search). */
+/** The groups' live files (one per group; older data has only data/live.json). */
+function liveFiles() {
+  const groups = Object.values(state.index.groups || {});
+  return groups.length ? groups.map(g => g.live).filter(Boolean) : ["live.json"];
+}
+
+/** Fetch every group's live file and merge them; if anything changed, redraw the page
+ *  (unless the visitor is typing a search). Entries get their file's date if they have none. */
 async function loadLiveStatus(redraw = false) {
-  try {
-    const resp = await fetch("data/live.json", { cache: "no-cache" });
-    if (!resp.ok) return; // no live file yet (e.g. off-season): use the daily record
-    const data = await resp.json();
-    const changed = data.updated !== state.liveStatus?.updated;
-    state.liveStatus = data;
-    if (redraw && changed && !document.activeElement?.classList.contains("search-input")) route(false);
-  } catch (err) {
-    console.warn("Live lift status unavailable:", err.message);
+  const parts = await Promise.all(liveFiles().map(async file => {
+    try {
+      const resp = await fetch(`data/${file}`, { cache: "no-cache" });
+      return resp.ok ? await resp.json() : null; // no live file yet (e.g. off-season): use the daily record
+    } catch (err) {
+      console.warn(`Live lift status unavailable (${file}):`, err.message);
+      return null;
+    }
+  }));
+  const merged = { updated: null, results: {} };
+  for (const p of parts.filter(Boolean)) {
+    if (!merged.updated || p.updated > merged.updated) merged.updated = p.updated;
+    for (const [id, e] of Object.entries(p.results || {})) merged.results[id] = { date: p.date, ...e };
   }
+  if (!parts.some(Boolean)) return;
+  const changed = JSON.stringify(parts.map(p => p?.updated)) !== state.liveStamp;
+  state.liveStamp = JSON.stringify(parts.map(p => p?.updated));
+  state.liveStatus = merged;
+  if (redraw && changed && !document.activeElement?.classList.contains("search-input")) route(false);
 }
 
 // ------------------------------------------------------------------ start
@@ -998,9 +1140,16 @@ async function start() {
     const labels = Object.keys(state.index.seasons || {}).sort();
     const label = labels[labels.length - 1];
     if (label) {
+      // Each resort's latest record (resorts record on their own local day).
       const season = await loadSeason(label);
-      state.latestDay = season.days[season.days.length - 1] || null;
-      state.latestDate = state.latestDay?.date || null;
+      const results = {};
+      for (const d of [...season.days].reverse()) {
+        for (const [id, r] of Object.entries(d.results)) {
+          if (!results[id]) { results[id] = r; state.latestDates[id] = d.date; }
+        }
+      }
+      state.latestDate = season.days[season.days.length - 1]?.date || null;
+      state.latestDay = { date: state.latestDate, results };
     }
     if (IS_DEMO) injectDemoSeason();
   } catch (err) {

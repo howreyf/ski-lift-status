@@ -1,0 +1,92 @@
+{
+ "results": [
+  {
+   "id": 1321,
+   "object_id": "Vivswcy98Anis0Qf",
+   "name": "Niseko Gondola",
+   "comment": "Niseko Gondola",
+   "status": "SUSPENDED",
+   "start_time": "",
+   "end_time": "",
+   "groomed": "なし",
+   "updateDate": "2026-11-16T02:21:51.000000Z"
+  },
+  {
+   "id": 1322,
+   "object_id": "zqiyCu1yygLl0ZwC",
+   "name": "Upper Village Gondola",
+   "comment": "Upper Village Gondola",
+   "status": "TODAY_CLOSED",
+   "start_time": "8:30",
+   "end_time": "15:30",
+   "groomed": "なし",
+   "updateDate": "2026-11-27T22:45:03.000000Z"
+  },
+  {
+   "id": 1323,
+   "object_id": "DTCXAmUidy9guPtR",
+   "name": "Village Express",
+   "comment": "Village Express",
+   "status": "SUSPENDED",
+   "start_time": "",
+   "end_time": "",
+   "groomed": "なし",
+   "updateDate": "2026-11-04T01:52:00.000000Z"
+  },
+  {
+   "id": 1324,
+   "object_id": "9D5xrlebskzFioYG",
+   "name": "Community Chair",
+   "comment": "community chair",
+   "status": "TODAY_CLOSED",
+   "start_time": "8:30",
+   "end_time": "15:30",
+   "groomed": "なし",
+   "updateDate": "2026-11-27T22:45:03.000000Z"
+  },
+  {
+   "id": 1325,
+   "object_id": "bdxNH6nklMqG9M9H",
+   "name": "Banzai Chair",
+   "comment": "Banzai Chair",
+   "status": "SUSPENDED",
+   "start_time": "",
+   "end_time": "",
+   "groomed": "なし",
+   "updateDate": "2026-11-04T01:52:00.000000Z"
+  },
+  {
+   "id": 1326,
+   "object_id": "1zz0A4WZZkDHAFjk",
+   "name": "Shin Mori No Gondola",
+   "comment": "Shin Morino Gondola",
+   "status": "SUSPENDED",
+   "start_time": "",
+   "end_time": "",
+   "groomed": "なし",
+   "updateDate": "2026-11-04T01:52:00.000000Z"
+  },
+  {
+   "id": 1327,
+   "object_id": "z1CooFuML1YJvkah",
+   "name": "Country Road Chair",
+   "comment": "country road chair",
+   "status": "SUSPENDED",
+   "start_time": "",
+   "end_time": "",
+   "groomed": "なし",
+   "updateDate": "2026-11-04T01:52:00.000000Z"
+  },
+  {
+   "id": 1328,
+   "object_id": "XQWXKamYXDx4IoFF",
+   "name": "Wonderland Chair",
+   "comment": "Wonderland Chair A and B",
+   "status": "SUSPENDED",
+   "start_time": "",
+   "end_time": "",
+   "groomed": "なし",
+   "updateDate": "2026-11-04T01:52:00.000000Z"
+  }
+ ]
+}

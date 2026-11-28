@@ -12,14 +12,15 @@ import re
 import unittest
 from pathlib import Path
 
-from scraper.common import (NA, RUN_STATUSES, STATUSES, clean_hours, guess_lift_type, level_en,
+from scraper.common import (GRADE_NAMES, NA, RUN_STATUSES, STATUSES, clean_hours, guess_lift_type, level_en,
                             run_status_from_text, status_from_text, to_number)
 from scraper.run import (in_season, load_config, load_season, monthly_check_in, save_season,
                          season_of, store_result, update_summary)
 
 FIXTURES = Path(__file__).parent / "fixtures"
-LIFT_TYPES = {"Ropeway", "Gondola", "Magic carpet", "Six", "Quad", "Triple", "Pair", "Single", NA}
-LEVELS = {"First timer", "Beginner", "Intermediate", "Advanced", "Expert", NA}
+LIFT_TYPES = {"Ropeway", "Gondola", "Magic carpet", "Eight", "Six", "Quad", "Triple", "Pair", "Single",
+              "Chairlift", "Surface lift", "Train", NA}
+LEVELS = {"First timer", "Beginner", "Intermediate", "Advanced", "Expert", NA, *GRADE_NAMES}
 JAPANESE = re.compile(r"[぀-ヺー-ヿ一-鿿]")  # skips the "・" separator
 
 # resort id: (lifts, open, hold, runs_open, runs_total, snow_depth_cm, new_snow_cm, temperature_c)
@@ -38,17 +39,46 @@ EXPECTED = {
     "nozawa-onsen":     (16, 0, 0, 0, 45, None, None, None),
     "gala-yuzawa":      (10, 0, 0, 0, 21, None, None, None),
     "zao-onsen":        (26, 3, 1, 0, 23, 40, 5, -5),
+    # Niseko United (yukiyama feeds)
+    "niseko-annupuri":  (6, 2, 0, 12, 13, 30, None, None),
+    "niseko-village":   (8, 0, 0, 0, 28, 183, None, None),
+    "niseko-hanazono":  (4, 1, 0, 0, 12, 37, None, None),
+    # Europe
+    "breuil-cervinia":  (14, 0, 0, 0, 34, None, None, None),
+    "livigno":          (32, 14, 0, None, None, None, None, None),
+    "zugspitze":        (8, 6, 0, 3, 12, None, None, None),
+    "zell-am-see-kaprun": (18, 7, 0, 9, 40, None, None, None),
+    # North America
+    "big-sky":          (40, 0, 0, 11, 318, 48, 8, None),
+    "aspen-mountain":   (6, 0, 0, 4, 138, 33, 0, None),
+    "jackson-hole":     (13, 0, 0, 6, 155, 20, 3, None),
+    "whistler-blackcomb": (12, 0, 0, 26, 295, None, None, None),
 }
+# Wording that honestly means "we don't know" (allowed to give status "unknown").
+UNKNOWN_WORDING = {"no information"}
 
 
-def fixture_for(resort: dict) -> Path:
-    ext = ".json" if resort.get("data_url") else ".html"
-    return FIXTURES / f"{resort['parser']}{ext}"
+def fixture_for(resort: dict, part: str = "") -> Path | None:
+    """tests/fixtures/<resort id or parser><part>.json|.html (a resort's own copy first, for
+    parsers several resorts share). part: "" (main page), "_runs" or "_snow"."""
+    for key in (resort["id"], resort["parser"]):
+        for ext in (".json", ".html"):
+            if (path := FIXTURES / f"{key}{part}{ext}").exists():
+                return path
+    return None
 
 
 def parse_fixture(resort: dict) -> dict:
+    """Like scrape_resort: the main page, plus the saved runs / snow pages where the resort
+    has runs_url / snow_url and a saved copy exists."""
     parser = importlib.import_module(f"scraper.parsers.{resort['parser']}")
-    return parser.parse(fixture_for(resort).read_text(encoding="utf-8"), resort.get("options") or {})
+    options = resort.get("options") or {}
+    parsed = parser.parse(fixture_for(resort).read_text(encoding="utf-8"), options)
+    if resort.get("runs_url") and (path := fixture_for(resort, "_runs")):
+        parsed["runs"] = parser.parse_runs(path.read_text(encoding="utf-8"), options)
+    if resort.get("snow_url") and (path := fixture_for(resort, "_snow")):
+        parsed.update({k: v for k, v in parser.parse_snow(path.read_text(encoding="utf-8"), options).items() if v is not None})
+    return parsed
 
 
 class TestEveryResort(unittest.TestCase):
@@ -74,7 +104,7 @@ class TestEveryResort(unittest.TestCase):
                 self.assertEqual(len(runs) or None, runs_total, "runs total")
                 self.assertEqual(r["snow_depth_cm"], depth, "snow depth")
                 self.assertEqual(r["new_snow_cm"], new, "new snow")
-                self.assertEqual(r["temperature_c"], temp, "temperature")
+                self.assertEqual(r.get("temperature_c"), temp, "temperature")
 
     def test_night_skiing_lifts_exist(self):
         """Every lift named under night_skiing in resorts.yaml must match a real lift name."""
@@ -96,7 +126,8 @@ class TestEveryResort(unittest.TestCase):
                     self.assertEqual(set(l), {"name", "name_en", "status", "raw", "hours", "lift_type"})
                     self.assertTrue(l["name"] and l["name_en"], l)
                     self.assertIn(l["status"], STATUSES, l)
-                    self.assertNotEqual(l["status"], "unknown", f"status wording not recognised: {l}")
+                    if l["raw"].lower() not in UNKNOWN_WORDING:
+                        self.assertNotEqual(l["status"], "unknown", f"status wording not recognised: {l}")
                     self.assertIn(l["lift_type"], LIFT_TYPES, l)
                     self.assertRegex(l["hours"], r"^(\d{2}:\d{2}-\d{2}:\d{2}|N/A)$", l)
 
@@ -122,7 +153,8 @@ class TestEveryResort(unittest.TestCase):
         for rid, r in self.results.items():
             with self.subTest(resort=rid):
                 if r["source_updated"] is not None:
-                    self.assertRegex(r["source_updated"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+09:00$")
+                    # ISO time with its offset (Japanese resorts give +09:00; feeds abroad UTC or local)
+                    self.assertRegex(r["source_updated"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?([+-]\d{2}:\d{2}|Z)$")
 
 
 class TestSpecificLifts(unittest.TestCase):
@@ -138,6 +170,15 @@ class TestSpecificLifts(unittest.TestCase):
             "name": "蔵王中央ロープウェイ", "name_en": "Zao Chuo Ropeway", "status": "hold",
             "raw": "運転見合わせ", "hours": "08:30-16:00", "lift_type": "Ropeway",
         })
+
+    def test_kiroro_without_lift_table_finds_no_lifts(self):
+        """Without its lift table, the course table under the next heading must not be read as lifts."""
+        from bs4 import BeautifulSoup
+        from scraper.parsers import kiroro
+        soup = BeautifulSoup((FIXTURES / "kiroro.html").read_text(encoding="utf-8"), "html.parser")
+        heading = next(h for h in soup.select("section h6") if h.get_text(strip=True).upper() == "LIFT STATUS")
+        heading.find_next("table").decompose()
+        self.assertEqual(kiroro.parse(str(soup), {})["lifts"], [])
 
     def test_furano_duplicate_names_get_zone(self):
         self.assertIn("Snow Escalator (Furano)", self.lifts["furano"])
@@ -503,6 +544,73 @@ class TestSeasonMonths(unittest.TestCase):
         self.assertTrue(monthly_check_in(index, "2027-06-01T09:17:00+09:00"))   # new month: check in
         self.assertEqual(index["last_checked"], "2027-06-01T09:17:00+09:00")
         self.assertTrue(monthly_check_in({"last_checked": None}, "2027-06-01T09:17:00+09:00"))
+
+
+class TestGroupsAndLocalTime(unittest.TestCase):
+    """Resorts abroad: groups (separate data files), time zones and local scraping hours."""
+
+    def test_every_resort_has_a_known_group_country_and_time_zone(self):
+        from zoneinfo import ZoneInfo
+        from scraper.run import groups_of, load_settings
+        groups = groups_of(load_settings())
+        for r in load_config():
+            with self.subTest(resort=r["id"]):
+                self.assertIn(r["group"], groups)
+                self.assertTrue(r["country"])
+                ZoneInfo(r["timezone"])  # raises if unknown
+        self.assertEqual({r["group"] for r in load_config() if r["country"] == "Japan"}, {"japan"})
+
+    def test_group_defaults_fill_in_missing_fields(self):
+        from scraper.run import resolve
+        groups = {"japan": {"country": "Japan", "timezone": "Asia/Tokyo"}, "europe": {"timezone": "Europe/Rome"}}
+        self.assertEqual({k: resolve({"id": "a"}, groups)[k] for k in ("group", "country", "timezone")},
+                         {"group": "japan", "country": "Japan", "timezone": "Asia/Tokyo"})
+        r = resolve({"id": "b", "group": "europe", "country": "Austria", "timezone": "Europe/Vienna"}, groups)
+        self.assertEqual((r["country"], r["timezone"]), ("Austria", "Europe/Vienna"))
+        with self.assertRaises(ValueError):
+            resolve({"id": "c", "group": "mars"}, groups)
+
+    def test_scraping_hours_are_local(self):
+        from scraper.run import in_hours
+        s = {"hours": ["09:00", "21:00"], "until": "22:00"}
+        self.assertEqual([h for h in ("08:59", "09:00", "15:30", "21:40", "22:00", "22:01") if in_hours(h, s)],
+                         ["09:00", "15:30", "21:40", "22:00"])
+
+    def test_daily_record_is_per_resort(self):
+        from scraper.run import daily_due
+        season = {"days": [{"date": "2026-12-02", "results": {"a": {}}}]}
+        self.assertFalse(daily_due(season, "2026-12-02", "10:00", "09:30", "a"))  # a already recorded today
+        self.assertTrue(daily_due(season, "2026-12-02", "10:00", "09:30", "b"))   # b (new resort) not yet
+        self.assertFalse(daily_due(season, "2026-12-02", "09:00", "09:30", "b"))  # too early there
+
+    def test_live_entries_keep_their_own_local_date(self):
+        import json, tempfile
+        from scraper.run import update_live
+        ok = lambda n: {"ok": True, "lifts_open": n, "runs_open": None, "lifts": [{"status": "open"}] * n, "runs": []}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "live.json"
+            update_live({"jp": ok(3)}, {"jp": "2026-12-02"}, "2026-12-02T00:10:00+00:00", path)
+            # later, a run that only scrapes another resort (on its own, earlier, local date)
+            self.assertTrue(update_live({"us": ok(5)}, {"us": "2026-12-01"}, "2026-12-02T01:00:00+00:00", path))
+            data = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual({k: (v["date"], v["lifts_open"]) for k, v in data["results"].items()},
+                             {"jp": ("2026-12-02", 3), "us": ("2026-12-01", 5)})
+            # `changed`: when that resort's status last changed (jp untouched by the second run)
+            self.assertEqual(data["results"]["jp"]["changed"], "2026-12-02T00:10:00+00:00")
+            self.assertEqual(data["results"]["us"]["changed"], "2026-12-02T01:00:00+00:00")
+            # same status again: nothing written
+            self.assertFalse(update_live({"us": ok(5)}, {"us": "2026-12-01"}, "2026-12-02T01:45:00+00:00", path))
+
+    def test_old_live_file_without_entry_dates_still_works(self):
+        import json, tempfile
+        from scraper.run import update_live
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "live.json"
+            path.write_text(json.dumps({"date": "2026-12-01", "updated": "t0", "results": {
+                "a": {"ok": True, "lifts_open": 2, "runs_open": None, "lifts": [{}] * 11, "runs": []}}}), encoding="utf-8")
+            short = {"ok": True, "lifts_open": 1, "runs_open": None, "lifts": [{}] * 4, "runs": []}
+            update_live({"a": short}, "2026-12-01", "t1", path)  # same day, fewer lifts: earlier entry kept
+            self.assertEqual(len(json.loads(path.read_text(encoding="utf-8"))["results"]["a"]["lifts"]), 11)
 
 
 class TestTemperatures(unittest.TestCase):

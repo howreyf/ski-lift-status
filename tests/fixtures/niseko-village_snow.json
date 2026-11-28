@@ -1,0 +1,44 @@
+{
+ "results": [
+  {
+   "id": 534,
+   "object_id": "",
+   "name": "At the foot of the ski slopes",
+   "comment": null,
+   "snow_state": "",
+   "snow_state_flg": false,
+   "snow_accumulation": 60,
+   "snow_accumulation_flg": false,
+   "snow_accumulation_difference": 0,
+   "temperature": 6,
+   "temperature_flg": false,
+   "weather": "Sunny",
+   "weather_flg": false,
+   "cource_state": "",
+   "cource_state_flg": false,
+   "wind_speed": "",
+   "createDate": "2020-02-22T22:37:14.000000Z",
+   "updateDate": "2026-11-27T22:44:24.000000Z"
+  },
+  {
+   "id": 592,
+   "object_id": "",
+   "name": "Ski slope summit",
+   "comment": null,
+   "snow_state": "",
+   "snow_state_flg": false,
+   "snow_accumulation": 183,
+   "snow_accumulation_flg": false,
+   "snow_accumulation_difference": 0,
+   "temperature": 2,
+   "temperature_flg": false,
+   "weather": "Sunny",
+   "weather_flg": false,
+   "cource_state": "",
+   "cource_state_flg": false,
+   "wind_speed": "",
+   "createDate": "2023-11-30T22:50:26.000000Z",
+   "updateDate": "2026-11-27T22:44:24.000000Z"
+  }
+ ]
+}

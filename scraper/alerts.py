@@ -22,6 +22,7 @@ import subprocess
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 DOWN_HOURS = 6       # alert when a resort has failed for this long
 DROP_SHARE = 0.75    # alert when fewer than 75% of the usual lifts/runs are listed
@@ -29,8 +30,10 @@ LABEL = "scraper alert"
 KEY_RE = re.compile(r"<!-- alert-key: (\S+) -->")
 
 
-def _jst(iso: str) -> str:
-    return datetime.fromisoformat(iso).strftime("%d %b %H:%M JST").lstrip("0")
+def _local(iso: str, tz: str = "Asia/Tokyo") -> str:
+    """'2026-12-01T00:08:00+00:00' -> '1 Dec 09:08 JST' (in the resort's time zone)."""
+    d = datetime.fromisoformat(iso).astimezone(ZoneInfo(tz))
+    return d.strftime(f"%d %b %H:%M {d.tzname()}").lstrip("0")
 
 
 # ---------------------------------------------------------------- finding problems
@@ -41,11 +44,12 @@ def down_problem(resort: dict, entry: dict | None, now: datetime) -> dict | None
     if not since or now - datetime.fromisoformat(since) < timedelta(hours=DOWN_HOURS):
         return None
     name, rid = resort["name"], resort["id"]
+    when = _local(since, resort.get("timezone", "Asia/Tokyo"))
     return {
         "key": f"down:{rid}",
-        "title": f"{name}: status page has failed since {_jst(since)}",
+        "title": f"{name}: status page has failed since {when}",
         "body": (
-            f"The scraper hasn't been able to read **{name}**'s status page since **{_jst(since)}**; "
+            f"The scraper hasn't been able to read **{name}**'s status page since **{when}**; "
             f"every run since then has failed.\n\n"
             f"Last error:\n```\n{(entry or {}).get('error', 'unknown')}\n```\n"
             f"Status page: {resort['url']}\n\n"
@@ -133,7 +137,7 @@ def main(argv: list[str]) -> int:
     for number, key in close:
         print(f"Closing issue #{number} ({key}): working again")
         _gh("issue", "close", str(number), "--comment",
-            f"Working again (checked {_jst(report['time'])}). Closed automatically.")
+            f"Working again (checked {_local(report['time'], 'UTC')}). Closed automatically.")
     if not report["problems"] and not close:
         print("No problems.")
     elif not create and not close:

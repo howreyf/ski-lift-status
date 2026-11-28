@@ -1,0 +1,44 @@
+{
+ "results": [
+  {
+   "id": 556,
+   "object_id": "",
+   "name": "TOP",
+   "comment": "",
+   "snow_state": "湿雪・ザラメ",
+   "snow_state_flg": false,
+   "snow_accumulation": 30,
+   "snow_accumulation_flg": false,
+   "snow_accumulation_difference": 0,
+   "temperature": 5,
+   "temperature_flg": false,
+   "weather": "曇",
+   "weather_flg": false,
+   "cource_state": "",
+   "cource_state_flg": false,
+   "wind_speed": "SW5",
+   "createDate": "2020-12-24T03:07:26.000000Z",
+   "updateDate": "2026-11-27T22:05:42.000000Z"
+  },
+  {
+   "id": 583,
+   "object_id": "",
+   "name": "BASE",
+   "comment": "",
+   "snow_state": "湿雪・ザラメ",
+   "snow_state_flg": false,
+   "snow_accumulation": 30,
+   "snow_accumulation_flg": false,
+   "snow_accumulation_difference": 0,
+   "temperature": 5,
+   "temperature_flg": false,
+   "weather": "曇",
+   "weather_flg": false,
+   "cource_state": "",
+   "cource_state_flg": false,
+   "wind_speed": "",
+   "createDate": "2021-12-12T00:14:17.000000Z",
+   "updateDate": "2026-11-27T22:05:42.000000Z"
+  }
+ ]
+}

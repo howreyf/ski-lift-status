@@ -347,11 +347,11 @@
      "snow_depth_mean_cm": 100.0
     },
     "kiroro": {
-     "lifts_total": 24,
+     "lifts_total": 9,
      "runs_total": 24,
      "snow_depth_max_cm": 100,
      "snow_depth_max_date": "2026-11-27",
-     "days_recorded": 2,
+     "days_recorded": 1,
      "summit_min_c": -4.3,
      "summit_max_c": 3.2,
      "base_min_c": 0.0,

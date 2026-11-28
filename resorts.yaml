@@ -2,10 +2,15 @@
 #
 #   id        short, permanent key used in docs/data/lifts.json (never change it once data exists)
 #   name      display name on the website
-#   region    used to group resorts on the website
+#   region    shown under the name; resorts are grouped by country, then region, on the website
+#   country   (optional) defaults to the group's country
+#   timezone  (optional) the resort's time zone (IANA name); defaults to the group's.
+#             Scraping hours and the daily record use the resort's local time.
+#   group     which data files the resort's records go in (see groups below); default japan
 #   url       the lift status page
 #   parser    file in scraper/parsers/ that reads the page (without .py)
 #   runs_url  (optional) a separate page with run status (the parser's parse_runs reads it)
+#   snow_url  (optional) a separate page with the snow report (the parser's parse_snow reads it)
 #   data_url  (optional) where the data is actually downloaded from, when the page loads it
 #             from a separate feed; `url` is still the page linked from the website
 #   fetch     "html" (plain download, default) or "browser" (Playwright, for JavaScript-built pages)
@@ -23,10 +28,41 @@
 
 # Months when lift data is collected (inclusive). Outside them the daily run only saves a
 # small monthly check-in, which keeps GitHub from switching the schedule off.
-season:
-  start_month: 11   # November
-  end_month: 5      # May (Niseko and Sapporo Kokusai close on 5 May)
-  daily_time: "09:30"   # Japan time: the first run at or after this writes the day's permanent record
+# When to scrape, in each resort's LOCAL time. The GitHub workflow starts every 45 minutes
+# around the clock; each run only scrapes the resorts whose local time is inside `hours`
+# (until `until`, because GitHub often starts runs late).
+schedule:
+  hours: ["09:00", "21:00"]
+  until: "22:00"
+  daily_time: "09:30"   # the first run at or after this (local) time writes the day's permanent record
+
+# Resort groups. Each group has its own data files, so no file gets too big and a run that
+# only changes Europe doesn't rewrite Japan's file:
+#   live_file     latest lift/run status (docs/data/...)
+#   season_file   every day of one season; {season} becomes e.g. 2026-27
+#   season        months when lift data is collected (inclusive), checked in local time.
+#                 Outside them nothing is scraped for that group.
+#   country / timezone   defaults for the group's resorts
+groups:
+  japan:
+    name: Japan
+    country: Japan
+    timezone: Asia/Tokyo
+    live_file: live.json
+    season_file: "seasons/{season}.json"
+    season: { start_month: 11, end_month: 5 }   # Niseko and Sapporo Kokusai close on 5 May
+  europe:
+    name: Europe
+    timezone: Europe/Rome
+    live_file: live-europe.json
+    season_file: "seasons/europe/{season}.json"
+    season: { start_month: 10, end_month: 5 }   # glaciers (Zugspitze, Kitzsteinhorn) open in October
+  north-america:
+    name: North America
+    timezone: America/Denver
+    live_file: live-north-america.json
+    season_file: "seasons/north-america/{season}.json"
+    season: { start_month: 11, end_month: 5 }   # Whistler Blackcomb runs into May
 
 resorts:
   # --- Hokkaido ---
@@ -42,6 +78,51 @@ resorts:
                    lifts: ["King Gondola (8-seater)", "King Holiday Pair Lift", "Ace Family Quad Lift"] }
     url: https://www.grand-hirafu.jp/snow/status/
     parser: niseko
+    enabled: true
+
+  # Niseko United: Annupuri, Niseko Village and Hanazono publish lift and course status
+  # through the yukiyama web API (also shown on https://www.niseko.ne.jp/en/niseko-lift-status/).
+  # skiareaId: 393 Annupuri, 394 Niseko Village, 379 Hanazono. Heights are approximate.
+  - id: niseko-annupuri
+    name: Niseko Annupuri
+    region: Hokkaido
+    location: { lat: 42.86, lon: 140.66 }
+    elevation: { base: 300, summit: 1160 }   # metres
+    website: https://annupuri.info/en/
+    map: { type: page, url: "https://www.niseko.ne.jp/en/map/annupuri/", note: "Trail map on the Niseko United site" }
+    url: https://www.niseko.ne.jp/en/niseko-lift-status/#tag_annupuri
+    data_url: https://web-api.yukiyama.biz/web-api/latest-facility/backward?facilityType=lift&lang=en&skiareaId=393
+    runs_url: https://web-api.yukiyama.biz/web-api/latest-facility/backward?facilityType=course&lang=ja&skiareaId=393
+    snow_url: https://web-api.yukiyama.biz/web-api/latest-weather/backward?lang=en&skiareaId=393
+    parser: yukiyama
+    enabled: true
+
+  - id: niseko-village
+    name: Niseko Village
+    region: Hokkaido
+    location: { lat: 42.83, lon: 140.69 }
+    elevation: { base: 255, summit: 1170 }   # metres
+    website: https://www.niseko-village.com/en/
+    map: { type: page, url: "https://www.niseko.ne.jp/en/map/village/", note: "Trail map on the Niseko United site" }
+    url: https://www.niseko.ne.jp/en/niseko-lift-status/#tag_village
+    data_url: https://web-api.yukiyama.biz/web-api/latest-facility/backward?facilityType=lift&lang=en&skiareaId=394
+    runs_url: https://web-api.yukiyama.biz/web-api/latest-facility/backward?facilityType=course&lang=en&skiareaId=394
+    snow_url: https://web-api.yukiyama.biz/web-api/latest-weather/backward?lang=en&skiareaId=394
+    parser: yukiyama
+    enabled: true
+
+  - id: niseko-hanazono
+    name: Niseko Hanazono
+    region: Hokkaido
+    location: { lat: 42.9, lon: 140.71 }
+    elevation: { base: 308, summit: 1180 }   # metres
+    website: https://hanazononiseko.com/en/winter
+    map: { type: page, url: "https://www.niseko.ne.jp/en/map/hanazono/", note: "Trail map on the Niseko United site" }
+    url: https://hanazononiseko.com/en/winter/resort/lift-status
+    data_url: https://web-api.yukiyama.biz/web-api/latest-facility/backward?facilityType=lift&lang=en&skiareaId=379
+    runs_url: https://web-api.yukiyama.biz/web-api/latest-facility/backward?facilityType=course&lang=en&skiareaId=379
+    snow_url: https://web-api.yukiyama.biz/web-api/latest-weather/backward?lang=en&skiareaId=379
+    parser: yukiyama
     enabled: true
 
   - id: kiroro
@@ -203,4 +284,133 @@ resorts:
     map: { type: image, url: "https://zaomountainresort.com/wp-content/uploads/2023/11/gmap2024_l.png" }
     url: https://zaomountainresort.com/ski/
     parser: zao
+    enabled: true
+
+  # ======================================================================== Europe
+  # Times: Europe/Rome, Europe/Berlin and Europe/Vienna are all Central European Time.
+
+  # --- Italy ---
+  - id: breuil-cervinia
+    name: Breuil-Cervinia
+    region: Aosta Valley
+    country: Italy
+    group: europe
+    timezone: Europe/Rome
+    location: { lat: 45.936, lon: 7.63 }
+    elevation: { base: 2050, summit: 3480 }   # metres (Plateau Rosa)
+    website: https://www.cervinia.it/en
+    map: { type: page, url: "https://www.cervinia.it/en/skirama", note: "Skirama: the Cervino Ski Paradise map" }
+    url: https://www.cervinia.it/en/impianti
+    parser: cervinia
+    enabled: true
+
+  - id: livigno
+    name: Livigno
+    region: Lombardy
+    country: Italy
+    group: europe
+    timezone: Europe/Rome
+    location: { lat: 46.538, lon: 10.135 }
+    elevation: { base: 1816, summit: 2797 }   # metres (Carosello 3000)
+    website: https://www.livigno.eu/en
+    map: { type: pdf, url: "https://www.skipasslivigno.com/app/uploads/2020/07/livigno-mappa-impianti-sci-piste-neve-inverno-skipass.pdf", note: "Livigno lifts and slopes map from Skipass Livigno" }
+    url: https://www.skipasslivigno.com/en/lifts-and-slopes/
+    parser: livigno
+    enabled: true
+
+  # --- Germany ---
+  - id: zugspitze
+    name: Zugspitze
+    region: Bavaria
+    country: Germany
+    group: europe
+    timezone: Europe/Berlin
+    location: { lat: 47.406, lon: 10.985 }
+    elevation: { base: 2000, summit: 2720 }   # metres (Zugspitzplatt glacier ski area)
+    website: https://zugspitze.de/en
+    map: { type: pdf, url: "https://zugspitze.de/Downloads/%C3%9Cbersichtskarten/Pistenplan_Zugspitze_Legende.pdf", note: "Zugspitze piste map" }
+    url: https://zugspitze.de/en/Service-information/Facilities
+    parser: zugspitze
+    options: { area: zugspitze }
+    enabled: true
+
+  # --- Austria ---
+  - id: zell-am-see-kaprun
+    name: Zell am See-Kaprun
+    region: Salzburg
+    country: Austria
+    group: europe
+    timezone: Europe/Vienna
+    location: { lat: 47.26, lon: 12.72 }
+    elevation: { base: 760, summit: 3029 }   # metres (Zell am See to the Kitzsteinhorn)
+    website: https://www.zellamsee-kaprun.com/en
+    map: { type: page, url: "https://www.zellamsee-kaprun.com/en/sport/winter/skimap", note: "Skimap" }
+    url: https://www.zellamsee-kaprun.com/en/service/live/pistes
+    parser: zell_am_see
+    enabled: true
+
+  # ======================================================================== North America
+
+  # --- USA ---
+  - id: big-sky
+    name: Big Sky
+    region: Montana
+    country: USA
+    group: north-america
+    timezone: America/Denver
+    location: { lat: 45.284, lon: -111.401 }
+    elevation: { base: 2072, summit: 3403 }   # metres (6,800 ft to Lone Peak, 11,166 ft)
+    website: https://www.bigskyresort.com/
+    map: { type: page, url: "https://www.bigskyresort.com/trail-maps", note: "Trail maps" }
+    url: https://www.bigskyresort.com/current-conditions
+    data_url: https://www.bigskyresort.com/api/reportpal?resortName=bs&useReportPal=true
+    parser: boyne
+    enabled: true
+
+  - id: aspen-mountain
+    name: Aspen Mountain
+    region: Colorado
+    country: USA
+    group: north-america
+    timezone: America/Denver
+    location: { lat: 39.186, lon: -106.818 }
+    elevation: { base: 2422, summit: 3418 }   # metres (7,945 ft to 11,212 ft)
+    website: https://www.aspensnowmass.com/four-mountains/aspen-mountain
+    map: { type: page, url: "https://www.aspensnowmass.com/four-mountains/aspen-mountain/trail-maps", note: "Trail map" }
+    url: https://www.aspensnowmass.com/four-mountains/aspen-mountain/snow-and-grooming-report
+    data_url: https://www.aspensnowmass.com/AspenSnowmass/LiftStatus/Feed?mountain=AspenMountain
+    runs_url: https://www.aspensnowmass.com/AspenSnowmass/GroomingReport/Feed?mountain=AspenMountain
+    snow_url: https://www.aspensnowmass.com/AspenSnowmass/SnowReport/Feed?mountain=AspenMountain
+    parser: aspen
+    enabled: true
+
+  - id: jackson-hole
+    name: Jackson Hole
+    region: Wyoming
+    country: USA
+    group: north-america
+    timezone: America/Denver
+    location: { lat: 43.588, lon: -110.828 }
+    elevation: { base: 1924, summit: 3185 }   # metres (6,311 ft to 10,450 ft)
+    website: https://www.jacksonhole.com/
+    map: { type: page, url: "https://www.jacksonhole.com/maps/mountain-winter", note: "Trail maps" }
+    url: https://www.jacksonhole.com/mountain-report#lifts-deck
+    data_url: https://jacksonhole-prod.zaneray.com/api/all.json
+    parser: jackson_hole
+    enabled: true
+
+  # --- Canada ---
+  - id: whistler-blackcomb
+    name: Whistler Blackcomb
+    region: British Columbia
+    country: Canada
+    group: north-america
+    timezone: America/Vancouver
+    location: { lat: 50.107, lon: -122.943 }
+    elevation: { base: 653, summit: 2284 }   # metres (2,140 ft to 7,494 ft)
+    website: https://www.whistlerblackcomb.com/
+    map: { type: page, url: "https://www.whistlerblackcomb.com/the-mountain/about-the-mountain/trail-maps.aspx", note: "Trail map" }
+    url: https://www.whistlerblackcomb.com/the-mountain/mountain-conditions/terrain-and-lift-status.aspx
+    fetch: browser   # Vail Resorts' sites refuse plain downloads
+    parser: vail
     enabled: true

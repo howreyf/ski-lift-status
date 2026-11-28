@@ -1,0 +1,49 @@
+{
+ "lastUpdated": "11:22 AM Nov 27, 2026",
+ "today": "<p>We are grateful for skiing, snowboarding and you!  Thanks to everyone who came out Thursday to celebrate the 80th time Aspen Mountain opened for the season!  </p>\n<p>Winter is officially underway. Start the season with fresh turns, open runs, and the stoke of getting back on the mountain. Keep the celebrations going this Saturday with opening parties at the Sundeck and Elk Camp. With snow in the forecast, the season is off to a promising start. Here's to 80 years of mountain memories and many more to come.</p>\n<p>Safety tip of the day: Always stay in control. You must be able to stop or avoid people or objects. Know and Obey the Code. It's Your Responsibility.</p>",
+ "status": "Open",
+ "todayInsider": null,
+ "todaySafety": null,
+ "snow24Hours": {
+  "centimeters": "0",
+  "inches": "0"
+ },
+ "snow48Hours": {
+  "centimeters": "0",
+  "inches": "0"
+ },
+ "snow72Hours": {
+  "centimeters": "0",
+  "inches": "0"
+ },
+ "snow7Days": {
+  "centimeters": "18",
+  "inches": "7"
+ },
+ "snowBase": {
+  "centimeters": "33",
+  "inches": "13"
+ },
+ "trails": {
+  "open": "3",
+  "total": "104",
+  "openCount": 3,
+  "totalCount": 104
+ },
+ "lifts": {
+  "open": "2",
+  "total": "6",
+  "openCount": 2,
+  "totalCount": 6
+ },
+ "acres": {
+  "open": "42",
+  "total": "828",
+  "openCount": 42,
+  "totalCount": 828
+ },
+ "percentBeginnerTerrainOpen": "0",
+ "percentIntermediateTerrainOpen": "8",
+ "percentAdvancedTerrainOpen": "0",
+ "percentExpertTerrainOpen": "0"
+}
