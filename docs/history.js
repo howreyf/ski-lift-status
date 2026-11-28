@@ -607,7 +607,7 @@ function highlightBoxes(unit, value) {
 async function renderHistoryDirectory() {
   const { unit, value } = historyPeriod();
   const token = ++historyDirToken;
-  const ids = resortIds();
+  const ids = [...resortIds(), ...areaIds()]; // resorts (for the highlights) and areas (table rows)
   const stats = await Promise.all(ids.map(id => periodStatsFor(id, unit, value)));
   if (token !== historyDirToken || !/^#\/history\/?$/.test(location.hash)) return; // changed again, or navigated away
   Object.assign(historyDir, { unit, value, stats: Object.fromEntries(ids.map((id, i) => [id, stats[i]])) });
@@ -1110,6 +1110,9 @@ async function renderHistoryPage(id, unit, value, carry = null) {
   const [start, end] = periodRange(unit, value);
   const label = unit === "season" ? value : seasonOf(start);
   const [recs, facts] = await Promise.all([recordsInRange(id, start, end), seasonFacts(id, label)]);
+  // An area (connected resorts): each resort's peak lifts / runs in the period, for its list.
+  const areaMemberStats = info.area ? Object.fromEntries(await Promise.all(
+    membersOf(id).map(async m => [m, await periodStatsFor(m, unit, value)]))) : {};
   if (historyUI.id !== id || historyUI.value !== value || historyUI.unit !== unit) return; // navigated away
 
   let content;
@@ -1132,12 +1135,17 @@ async function renderHistoryPage(id, unit, value, carry = null) {
       <div>
         <h1 class="page-title">${esc(info.name)}${nightIcon(nightSkiing(id, start))} <span class="badge-historical">Historical</span></h1>
         <p class="resort-links small">
-          ${info.website ? `<a href="${esc(info.website)}" target="_blank" rel="noopener">Official website ↗</a> · ` : ""}${esc(placeOf(id))}
+          ${info.website ? `<a href="${esc(info.website)}" target="_blank" rel="noopener">Official website ↗</a> · ` : ""}${esc(placeOf(id))}${
+            areaOfResort(id) ? ` · part of <a href="${esc(`#/history/${areaOfResort(id)}/${unit}/${value}`)}">${esc(state.index.resorts[areaOfResort(id)].name)}</a>` : ""}
         </p>
+        ${info.area ? `<p class="muted small">${membersOf(id).length} connected resorts: lifts and runs are totals; snow and temperatures are averages.</p>` : ""}
       </div>
       <div class="head-buttons">
-        <button type="button" class="button button-secondary" data-compare
-          title="Add ${esc(info.name)} (${esc(compareItemLabel(unit, value))}) to Compare">+ Compare</button>
+        ${info.area
+          ? `<button type="button" class="button" data-compare-area
+              title="Open Compare's graph with every resort of ${esc(info.name)} (${esc(compareItemLabel(unit, value))})">Compare all ${membersOf(id).length}</button>`
+          : `<button type="button" class="button button-secondary" data-compare
+              title="Add ${esc(info.name)} (${esc(compareItemLabel(unit, value))}) to Compare">+ Compare</button>`}
         <a class="button button-secondary" href="#/resort/${esc(id)}">Switch to present</a>
       </div>
     </div>
@@ -1145,6 +1153,10 @@ async function renderHistoryPage(id, unit, value, carry = null) {
     <div class="period" aria-label="Choose a period">${segHtml(UNITS, unit)}${pickerHtml(unit, value)}</div>
 
     ${factsHtml(facts)}
+    ${info.area ? areaMembersHtml(id, m => {
+      const st = areaMemberStats[m];
+      return st?.lifts ? `Peak lifts <strong>${st.lifts.r.lifts_open}</strong> / ${st.lifts.r.lifts.length} · Peak runs ${st.runs ? runsHtml({ ok: true, runs: st.runs.r.runs }) : NA}` : "No data in this period";
+    }, m => `#/history/${m}/${unit}/${value}`) : ""}
     ${content}`;
 
   // period controls
@@ -1154,8 +1166,9 @@ async function renderHistoryPage(id, unit, value, carry = null) {
     goHistory(id, b.dataset.unit, unitContaining(b.dataset.unit, anchor));
   }));
   setupPicker(view.querySelector(".picker"), unit, value, v => goHistory(id, unit, v));
-  view.querySelector("[data-compare]").addEventListener("click", e =>
+  view.querySelector("[data-compare]")?.addEventListener("click", e =>
     addToCompareWithAnimation(id, unit, value, view.querySelector(".page-title"), e.currentTarget));
+  if (info.area) setupAreaButtons(id, { unit, value });
 
   // boxes: expand / collapse
   view.querySelectorAll(".box-clickable[data-box]").forEach(el => {

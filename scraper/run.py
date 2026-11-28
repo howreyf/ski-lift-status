@@ -182,10 +182,10 @@ def save_season(season: dict, data_dir: Path | None = None, pattern: str = SEASO
 # ---------------------------------------------------------------- scraping
 
 @functools.lru_cache(maxsize=None)
-def fetch_once(url: str, method: str, referer: str | None) -> str:
+def fetch_once(url: str, method: str, referer: str | None, data: str | None = None) -> str:
     """Download each address only once per run (Hakuba Valley's page serves 3 resorts).
     Failed downloads aren't remembered, so the next resort using that page tries again."""
-    return fetch(url, method, referer=referer)
+    return fetch(url, method, referer=referer, data=data)
 
 
 def scrape_resort(resort: dict, html_override: str | None = None, now: datetime | None = None) -> dict:
@@ -213,7 +213,9 @@ def scrape_resort(resort: dict, html_override: str | None = None, now: datetime 
                 print(f"  runs page failed ({type(e).__name__}: {e}); recording lifts only")
         if resort.get("snow_url") and html_override is None:
             try:
-                snow = parser.parse_snow(fetch_once(resort["snow_url"], method, resort["url"]), resort.get("options") or {})
+                # snow_post: send this form body (POST) instead of a GET; snow_fetch: html/browser
+                text = fetch_once(resort["snow_url"], resort.get("snow_fetch", method), resort["url"], resort.get("snow_post"))
+                snow = parser.parse_snow(text, resort.get("options") or {})
                 parsed.update({k: v for k, v in snow.items() if v is not None})
             except Exception as e:
                 print(f"  snow report failed ({type(e).__name__}: {e}); recording without it")
@@ -410,13 +412,23 @@ def update_live(results: dict[str, dict], today: str | dict[str, str], now_iso: 
         prev = (old_e if old_e.get("date") == day else None) or (baseline or {}).get(rid)
         new = live_entry(result)
         if prev and prev.get("ok") and (not new["ok"] or len(new["lifts"]) < len(prev["lifts"])):
-            new = {k: v for k, v in prev.items() if k not in ("date", "changed")}
+            new = {k: v for k, v in prev.items() if k not in ("date", "changed", "open_today")}
         new.pop("failing_since", None)
         new.pop("error", None)
         if not result["ok"]:
             new["failing_since"] = old_e.get("failing_since") or now_iso
             new["error"] = result["error"]
         new["date"] = day
+        # Lifts and runs seen open at any check this (local) day: after closing time the website
+        # keeps showing them as open, with a note that they're closed for the day.
+        seen = ((old_e.get("open_today") if old_e.get("date") == day else None)
+                or open_names((baseline or {}).get(rid) or {}))
+        now_open = open_names(new)
+        open_today = {k: sorted(set(seen.get(k, [])) | set(now_open.get(k, []))) for k in ("lifts", "runs")}
+        if open_today["lifts"] or open_today["runs"]:
+            new["open_today"] = open_today
+        else:
+            new.pop("open_today", None)
         new["changed"] = old_e.get("changed") or old.get("updated") or now_iso \
             if _comparable(new) == _comparable(old_e) else now_iso
         entries[rid] = new
@@ -427,6 +439,14 @@ def update_live(results: dict[str, dict], today: str | dict[str, str], now_iso: 
     dates = [e["date"] for e in entries.values() if e.get("date")]
     _write_json(path, {"date": max(dates) if dates else None, "updated": now_iso, "results": entries}, compact=True)
     return True
+
+
+def open_names(entry: dict) -> dict[str, list[str]]:
+    """Names of the lifts open and the runs open (or partly open) in a live entry."""
+    if not entry.get("ok"):
+        return {}
+    return {"lifts": [l["name"] for l in entry.get("lifts") or [] if l.get("status") == "open" and l.get("name")],
+            "runs": [r["name"] for r in entry.get("runs") or [] if r.get("status") in ("open", "partial") and r.get("name")]}
 
 
 def daily_due(season: dict, today: str, now_hhmm: str, daily_time: str, resort_id: str | None = None) -> bool:
@@ -588,9 +608,15 @@ def main(argv: list[str] | None = None) -> int:
     for p in problems:
         print(f"ALERT: {p['title']}")
 
-    # 4. Weather and season summaries for the resorts recorded today; save.
-    if written:
-        update_weather({r["id"]: season_for(r) for r in written}, written, today_of)
+    # 4. Weather and season summaries for the resorts recorded today (and any whose record for
+    #    today still has no temperatures, e.g. Open-Meteo timed out on an earlier run); save.
+    def record_today(r: dict) -> dict | None:
+        day = next((d for d in season_for(r)["days"] if d["date"] == today_of[r["id"]]), None)
+        return (day or {}).get("results", {}).get(r["id"])
+    no_temps = [r for r in due if r not in written and (rec := record_today(r)) is not None and not rec.get("temps")]
+    if written or no_temps:
+        weathered = update_weather({r["id"]: season_for(r) for r in written + no_temps}, written + no_temps, today_of)
+        written += [r for r in no_temps if r["id"] in weathered]
         for r in written:
             summaries = index["seasons"].setdefault(season_of(today_of[r["id"]]), {}).setdefault("summary", {})
             update_summary(summaries.setdefault(r["id"], {}), season_for(r), r["id"], results[r["id"]])
@@ -607,7 +633,7 @@ def main(argv: list[str] | None = None) -> int:
             by_group[g] = [d["date"] for d in season["days"]]
             entry["dates"] = sorted({d for ds in by_group.values() for d in ds})
             print(f"Saved docs/data/{files[g]}")
-        refresh_resorts(index, every)
+        refresh_resorts(index, every, settings.get("areas"))
         index["last_updated"] = index["last_checked"] = now_utc.isoformat()
         save_index(index)
         print("Saved docs/data/lifts.json")
@@ -619,8 +645,24 @@ def main(argv: list[str] | None = None) -> int:
     return 1 if due and failures == len(due) else 0
 
 
-def refresh_resorts(index: dict, every: list[dict]) -> None:
-    """Resort details from resorts.yaml, in its order (the website lists them in this order)."""
+def area_info(area: dict, every: list[dict]) -> dict:
+    """What lifts.json lists about a group of connected resorts (e.g. Niseko United)."""
+    first = next(r for r in every if r["id"] == area["resorts"][0])
+    return {
+        "name": area["name"],
+        "region": area.get("region", first["region"]),
+        "country": area.get("country", first.get("country") or ""),
+        "timezone": first["timezone"],
+        "resorts": list(area["resorts"]),
+        **({"website": area["website"]} if area.get("website") else {}),
+        **({"source_url": area["url"]} if area.get("url") else {}),
+        **({"map": area["map"]} if area.get("map") else {}),
+    }
+
+
+def refresh_resorts(index: dict, every: list[dict], areas: list[dict] | None = None) -> None:
+    """Resort (and area) details from resorts.yaml, in its order (the website lists them in this order)."""
+    index["areas"] = {a["id"]: area_info(a, every) for a in areas or []}
     for r in every:
         if r.get("enabled", True) or r["id"] in index["resorts"]:
             index["resorts"][r["id"]] = resort_info(r)

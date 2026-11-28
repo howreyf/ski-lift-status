@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import re
 
-from scraper.common import clean_hours, clean_text, lift, run
+from scraper.common import clean_hours, clean_text, lift, run, to_number
 
 LIFT_STATUS = {"open": "open", "closed": "closed", "scheduled": "closed", "onhold": "hold", "hold": "hold",
                "delayed": "hold", "windhold": "hold"}
@@ -62,3 +62,14 @@ def parse(html: str, options: dict) -> dict:
                             grade=GRADE.get(clean_text(str(t.get("Difficulty"))).lower())))
     return {"source_updated": feed.get("Date") if isinstance(feed.get("Date"), str) and "T" in feed.get("Date") else None,
             "snow_depth_cm": None, "new_snow_cm": None, "lifts": lifts, "runs": runs}
+
+
+def parse_snow(html: str, options: dict) -> dict:
+    """Snow report page (snow_url, opened in a browser too): FR.snowReportData = {"BaseDepth":
+    {"Centimeters": ...}, "TwentyFourHourSnowfall": {...}, ...}."""
+    m = re.search(r"snowReportData\s*=\s*(\{.*?\});\s*$", html, re.M)
+    if not m:
+        return {}
+    data = json.loads(m.group(1))
+    cm = lambda key: to_number((data.get(key) or {}).get("Centimeters"))
+    return {"snow_depth_cm": cm("BaseDepth"), "new_snow_cm": cm("TwentyFourHourSnowfall")}

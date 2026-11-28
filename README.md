@@ -49,6 +49,28 @@ Plain HTML/CSS/JavaScript, no build step. Pages (the part after `#` in the addre
 
 | Compare | `#/compare` | One list of up to 10 resorts, each with a season (e.g. 26-27), shared by both modes, and one time range at the top for all of them: Season (each resort's whole season) or Month, from one month to another (e.g. December–January of each resort's own season). Graph mode: a line each, seasons lined up by date; choose the data point and "As a percentage". Side-by-side mode: a column each, sections open together |
 
+**Connected resorts (areas):** `areas:` in `resorts.yaml` (now Niseko United = Grand Hirafu,
+Annupuri, Village and Hanazono) shows the resorts as ONE row on Resorts and Historical, with
+one present page (`#/resort/niseko-united`) and one history page (`#/history/niseko-united/...`).
+Lifts and runs are totals (each named with its resort), snow depth, new snow, temperatures and
+season summary values are averages of the resorts (`docs/areas.js`, combined in the browser from
+the resorts' records). The area pages list its resorts with "Open ›" and "+ Compare" buttons, and
+"Compare all" loads all of them into Compare's graph (for that season). Each resort keeps its own
+pages ("part of Niseko United" links back), search results and Compare entries.
+
+**After hours:** resorts mark lifts closed once they shut for the day. The live files remember
+which lifts and runs were open at any check that (local) day (`open_today`); a lift that ran
+today and is closed after its closing time (or, without published hours, after the resort's last
+closing time / once nothing runs after its first one; 15:00 if no hours at all) is shown as
+**Open** with "closed after hours" beside it, and counts as open. Closures during the day (wind)
+stay closed. Runs follow the resort. Daily records (09:30) are not affected.
+
+**Weather everywhere:** live temperature, today's forecast low/high, the next-snow outlook and
+(where a resort doesn't report new snow) the last 24 hours of snowfall at the summit come from
+Open-Meteo in the visitor's browser, so every resort has them even before its daily record is
+written. Open-Meteo's modelled snow depth isn't used (it's far off in the mountains, e.g. 5 cm
+at Niseko Village when the resort reports 183 cm).
+
 **Night skiing:** `night_skiing` in `resorts.yaml` (per season: dates, hours, lifts) shows a moon
 symbol beside the resort and its night lifts; hovering shows the dates.
 
@@ -163,6 +185,7 @@ groups' season files for the season being viewed (merged by date) and their live
 last_updated                       when lift data was last scraped
 last_checked                       when the scraper last ran (includes off-season monthly check-ins)
 groups.<group>                     name, live ("live-europe.json"), season_months {start, end}
+areas.<id>                         name, region, country, timezone, resorts [ids], website, source_url, map
 schedule                           hours ["09:00", "21:00"], daily_time (local times)
 resorts.<id>                       name, region, country, group, timezone, source_url, website,
                                    map {type, url, note}, location {lat, lon}, elevation_m {summit, base}
@@ -200,7 +223,8 @@ status, replaced on every run that finds a change):
 date                               newest local date among the entries
 updated                            when a status last changed (any resort in the file)
 results.<id>                       date (the resort's local date), changed (when its status last
-                                   changed), ok, lifts_open, runs_open, lifts[], runs[]
+                                   changed), ok, lifts_open, runs_open, lifts[], runs[],
+                                   open_today {lifts, runs} (names seen open at any check that day)
                                    (or ok: false, error, failing_since)
 ```
 
@@ -258,14 +282,14 @@ non-commercial use, credit shown in the website footer). Code: `scraper/weather.
 | GALA Yuzawa | N/A | N/A | N/A | yes |
 | Zao Onsen | yes | yes | yes | yes |
 | Niseko Annupuri / Village / Hanazono | yes | yes (summit) | N/A | yes (no difficulty) |
-| Breuil-Cervinia | yes | N/A | N/A | yes |
-| Livigno | N/A | N/A | N/A | N/A (all of Livigno's lifts on one page, no run list) |
-| Zugspitze | when open | N/A | N/A | yes (no difficulty) |
-| Zell am See-Kaprun | yes | N/A | N/A | yes (Kitzsteinhorn and Schmittenhöhe; lifts list has the main cable cars and gondolas only) |
+| Breuil-Cervinia | yes | yes (Plateau Rosa, from /en/meteo) | N/A | yes |
+| Livigno | N/A | yes (the larger of the two figures in Skipass Livigno's header; a form POST) | N/A | N/A (all of Livigno's lifts on one page, no run list) |
+| Zugspitze | when open | yes (mountain, from the weather page) | N/A | yes (no difficulty) |
+| Zell am See-Kaprun | yes | yes (Kitzsteinhorn, from the snow report) | N/A | yes (Kitzsteinhorn and Schmittenhöhe; lifts list has the main cable cars and gondolas only) |
 | Big Sky | when given | yes | N/A | yes |
 | Aspen Mountain | yes | yes | N/A | yes |
 | Jackson Hole | N/A | yes (mid-mountain) | N/A | yes |
-| Whistler Blackcomb | yes | N/A | N/A | yes (page opened in a browser: Vail Resorts refuses plain downloads) |
+| Whistler Blackcomb | yes | yes (base, snow report page; also new snow) | N/A | yes (pages opened in a browser: Vail Resorts refuses plain downloads) |
 
 Abroad, the scraper reads the same JSON feeds the resorts' own pages load (Niseko's yukiyama API,
 Big Sky, Aspen, Jackson Hole), or the page itself. Snow depth there is converted from inches where needed.

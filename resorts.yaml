@@ -10,7 +10,8 @@
 #   url       the lift status page
 #   parser    file in scraper/parsers/ that reads the page (without .py)
 #   runs_url  (optional) a separate page with run status (the parser's parse_runs reads it)
-#   snow_url  (optional) a separate page with the snow report (the parser's parse_snow reads it)
+#   snow_url  (optional) a separate page with the snow report (the parser's parse_snow reads it);
+#             snow_post: send this form body as a POST instead of a GET
 #   data_url  (optional) where the data is actually downloaded from, when the page loads it
 #             from a separate feed; `url` is still the page linked from the website
 #   fetch     "html" (plain download, default) or "browser" (Playwright, for JavaScript-built pages)
@@ -63,6 +64,18 @@ groups:
     live_file: live-north-america.json
     season_file: "seasons/north-america/{season}.json"
     season: { start_month: 11, end_month: 5 }   # Whistler Blackcomb runs into May
+
+# Connected resorts (one lift network): shown on the website as one row and one page under
+# their shared name, with totals (lifts, runs) and averages (snow, temperatures) of the
+# resorts, and buttons to each resort. Each resort is still scraped, stored and comparable on
+# its own. id must differ from every resort id.
+areas:
+  - id: niseko-united
+    name: Niseko United
+    resorts: [niseko-hirafu, niseko-annupuri, niseko-village, niseko-hanazono]
+    website: https://www.niseko.ne.jp/en/
+    url: https://www.niseko.ne.jp/en/niseko-lift-status/
+    map: { type: page, url: "https://www.niseko.ne.jp/en/map/", note: "Niseko United trail maps" }
 
 resorts:
   # --- Hokkaido ---
@@ -301,6 +314,7 @@ resorts:
     website: https://www.cervinia.it/en
     map: { type: page, url: "https://www.cervinia.it/en/skirama", note: "Skirama: the Cervino Ski Paradise map" }
     url: https://www.cervinia.it/en/impianti
+    snow_url: https://www.cervinia.it/en/meteo   # snow depth per place; Plateau Rosa = summit
     parser: cervinia
     enabled: true
 
@@ -315,6 +329,8 @@ resorts:
     website: https://www.livigno.eu/en
     map: { type: pdf, url: "https://www.skipasslivigno.com/app/uploads/2020/07/livigno-mappa-impianti-sci-piste-neve-inverno-skipass.pdf", note: "Livigno lifts and slopes map from Skipass Livigno" }
     url: https://www.skipasslivigno.com/en/lifts-and-slopes/
+    snow_url: https://www.skipasslivigno.com/wp/wp-admin/admin-ajax.php   # the site's header widget
+    snow_post: "action=getSkipassWidgetData&lang=en"
     parser: livigno
     enabled: true
 
@@ -330,6 +346,7 @@ resorts:
     website: https://zugspitze.de/en
     map: { type: pdf, url: "https://zugspitze.de/Downloads/%C3%9Cbersichtskarten/Pistenplan_Zugspitze_Legende.pdf", note: "Zugspitze piste map" }
     url: https://zugspitze.de/en/Service-information/Facilities
+    snow_url: https://zugspitze.de/en/Service-information/Weather
     parser: zugspitze
     options: { area: zugspitze }
     enabled: true
@@ -346,6 +363,7 @@ resorts:
     website: https://www.zellamsee-kaprun.com/en
     map: { type: page, url: "https://www.zellamsee-kaprun.com/en/sport/winter/skimap", note: "Skimap" }
     url: https://www.zellamsee-kaprun.com/en/service/live/pistes
+    snow_url: https://www.zellamsee-kaprun.com/en/service/live/snow-report   # Kitzsteinhorn (3000 m)
     parser: zell_am_see
     enabled: true
 
@@ -411,6 +429,7 @@ resorts:
     website: https://www.whistlerblackcomb.com/
     map: { type: page, url: "https://www.whistlerblackcomb.com/the-mountain/about-the-mountain/trail-maps.aspx", note: "Trail map" }
     url: https://www.whistlerblackcomb.com/the-mountain/mountain-conditions/terrain-and-lift-status.aspx
+    snow_url: https://www.whistlerblackcomb.com/the-mountain/mountain-conditions/snow-and-weather-report.aspx
     fetch: browser   # Vail Resorts' sites refuse plain downloads
     parser: vail
     enabled: true

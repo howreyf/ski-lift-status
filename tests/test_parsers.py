@@ -44,15 +44,15 @@ EXPECTED = {
     "niseko-village":   (8, 0, 0, 0, 28, 183, None, None),
     "niseko-hanazono":  (4, 1, 0, 0, 12, 37, None, None),
     # Europe
-    "breuil-cervinia":  (14, 0, 0, 0, 34, None, None, None),
-    "livigno":          (32, 14, 0, None, None, None, None, None),
-    "zugspitze":        (8, 6, 0, 3, 12, None, None, None),
-    "zell-am-see-kaprun": (18, 7, 0, 9, 40, None, None, None),
+    "breuil-cervinia":  (14, 0, 0, 0, 34, 130, None, None),
+    "livigno":          (32, 14, 0, None, None, 36, None, None),
+    "zugspitze":        (8, 6, 0, 3, 12, 40, None, None),
+    "zell-am-see-kaprun": (18, 7, 0, 9, 40, 60, None, None),
     # North America
     "big-sky":          (40, 0, 0, 11, 318, 48, 8, None),
     "aspen-mountain":   (6, 0, 0, 4, 138, 33, 0, None),
     "jackson-hole":     (13, 0, 0, 6, 155, 20, 3, None),
-    "whistler-blackcomb": (12, 0, 0, 26, 295, None, None, None),
+    "whistler-blackcomb": (12, 0, 0, 26, 295, 98, 3, None),
 }
 # Wording that honestly means "we don't know" (allowed to give status "unknown").
 UNKNOWN_WORDING = {"no information"}
@@ -560,6 +560,23 @@ class TestGroupsAndLocalTime(unittest.TestCase):
                 ZoneInfo(r["timezone"])  # raises if unknown
         self.assertEqual({r["group"] for r in load_config() if r["country"] == "Japan"}, {"japan"})
 
+    def test_areas_list_existing_resorts_once(self):
+        from scraper.run import area_info, load_settings, refresh_resorts
+        settings, resorts = load_settings(), load_config()
+        ids = {r["id"] for r in resorts}
+        seen = set()
+        for a in settings.get("areas") or []:
+            with self.subTest(area=a["id"]):
+                self.assertNotIn(a["id"], ids, "an area id must differ from every resort id")
+                self.assertTrue(set(a["resorts"]) <= ids, "unknown resort in area")
+                self.assertFalse(seen & set(a["resorts"]), "a resort can only be in one area")
+                seen |= set(a["resorts"])
+        index = {"resorts": {}, "seasons": {}}
+        refresh_resorts(index, resorts, settings.get("areas"))
+        self.assertEqual(index["areas"]["niseko-united"]["resorts"],
+                         ["niseko-hirafu", "niseko-annupuri", "niseko-village", "niseko-hanazono"])
+        self.assertEqual(index["areas"]["niseko-united"]["timezone"], "Asia/Tokyo")
+
     def test_group_defaults_fill_in_missing_fields(self):
         from scraper.run import resolve
         groups = {"japan": {"country": "Japan", "timezone": "Asia/Tokyo"}, "europe": {"timezone": "Europe/Rome"}}
@@ -600,6 +617,21 @@ class TestGroupsAndLocalTime(unittest.TestCase):
             self.assertEqual(data["results"]["us"]["changed"], "2026-12-02T01:00:00+00:00")
             # same status again: nothing written
             self.assertFalse(update_live({"us": ok(5)}, {"us": "2026-12-01"}, "2026-12-02T01:45:00+00:00", path))
+
+    def test_open_today_remembers_lifts_and_resets_next_day(self):
+        import json, tempfile
+        from scraper.run import update_live
+        res = lambda *st: {"ok": True, "lifts_open": st.count("open"), "runs_open": None, "runs": [],
+                           "lifts": [{"name": f"L{i}", "status": s} for i, s in enumerate(st)]}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "live.json"
+            update_live({"a": res("open", "closed")}, "2026-12-01", "t1", path)
+            update_live({"a": res("closed", "open")}, "2026-12-01", "t2", path)   # L0 closed for the day
+            update_live({"a": res("closed", "closed")}, "2026-12-01", "t3", path)
+            entry = json.loads(path.read_text(encoding="utf-8"))["results"]["a"]
+            self.assertEqual(entry["open_today"], {"lifts": ["L0", "L1"], "runs": []})
+            update_live({"a": res("closed", "closed")}, "2026-12-02", "t4", path)  # next morning
+            self.assertNotIn("open_today", json.loads(path.read_text(encoding="utf-8"))["results"]["a"])
 
     def test_old_live_file_without_entry_dates_still_works(self):
         import json, tempfile

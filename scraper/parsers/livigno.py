@@ -41,3 +41,14 @@ def parse(html: str, options: dict) -> dict:
         lifts.append(lift(f"{short} (no. {number})" if number else short, raw, status=status,
                           lift_type=ICON_TYPE.get(icon_cls), type_text=name))
     return {"source_updated": None, "snow_depth_cm": None, "new_snow_cm": None, "lifts": lifts, "runs": []}
+
+
+def parse_snow(text: str, options: dict) -> dict:
+    """Snow (snow_url: Skipass Livigno's header widget, a form POST to admin-ajax.php with
+    action=getSkipassWidgetData). It shows "36 cm / 0 cm" under "snow" (most likely mountain /
+    village; not labelled), so the larger figure is used as the snow depth."""
+    import json
+    import re
+    html = json.loads(text).get("livignoLive", "")
+    m = re.search(r"(\d+)\s*cm\s*/\s*(\d+)\s*cm", html)
+    return {"snow_depth_cm": max(int(m.group(1)), int(m.group(2)))} if m else {}

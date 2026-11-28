@@ -692,3 +692,22 @@ footer { margin: 28px auto 32px; line-height: 1.6; }
   }
   .tabs a { padding: 6px 10px; }
 }
+
+/* connected resorts (areas): the list of resorts on the area's pages */
+.area-members { margin: 8px 0 20px; }
+.area-members h2 { font-size: 16px; margin: 0 0 10px; }
+.member-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.member-card {
+  display: flex; flex-direction: column; gap: 8px; padding: 12px 14px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+}
+.member-name { font-weight: 700; color: var(--text); text-decoration: none; }
+.member-name:hover { color: var(--accent); }
+.member-numbers { font-size: 14px; color: var(--muted); display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.member-numbers strong { color: var(--text); }
+.member-buttons { display: flex; gap: 6px; margin-top: auto; }
+.button-small { padding: 5px 10px; font-size: 13px; }
+
+/* lifts/runs that ran today and have now closed for the day */
+.after-hours { display: inline-block; margin-left: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.after-hours-note { color: var(--muted); }

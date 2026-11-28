@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from bs4 import BeautifulSoup
 
-from scraper.common import clean_hours, clean_text, lift, run
+from scraper.common import clean_hours, clean_text, lift, run, to_number
 
 TYPE = {"aerial tramway": "Ropeway", "cogwheel train": "Train", "6-seat chairlift": "Six",
         "4-seat chairlift": "Quad", "t-bar lift": "Surface lift", "drag lift": "Surface lift",
@@ -57,3 +57,16 @@ def parse(html: str, options: dict) -> dict:
     if not lifts:
         raise ValueError(f"no '{area}' lifts section on the page")
     return {"source_updated": None, "snow_depth_cm": None, "new_snow_cm": None, "lifts": lifts, "runs": runs}
+
+
+def parse_snow(html: str, options: dict) -> dict:
+    """Snow report (snow_url: zugspitze.de/en/Service-information/Weather): "Snow depth
+    mountain" and "Depth of fresh snow" ("–" when none is reported)."""
+    soup = BeautifulSoup(html, "html.parser")
+    values = {}
+    for dt in soup.select("dt"):
+        dd = dt.find_next_sibling("dd")
+        if dd:
+            values.setdefault(clean_text(dt.get_text()).lower(), clean_text(dd.get_text()))
+    return {"snow_depth_cm": to_number(values.get("snow depth mountain")),
+            "new_snow_cm": to_number(values.get("depth of fresh snow"))}

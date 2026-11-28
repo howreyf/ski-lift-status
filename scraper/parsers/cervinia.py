@@ -13,7 +13,7 @@ import re
 
 from bs4 import BeautifulSoup
 
-from scraper.common import clean_hours, clean_text, lift, run, unique_names
+from scraper.common import clean_hours, clean_text, lift, run, to_number, unique_names
 
 STATUS = {"O": "open", "F": "closed", "P": "closed", "H": "closed", "HP": "closed"}
 RAW = {"O": "Open", "F": "Closed", "P": "Expected opening", "H": "Out of service", "HP": "Out of service"}
@@ -73,3 +73,16 @@ def parse(html: str, options: dict) -> dict:
         runs.append(run(_name(item).title(), RAW.get(code, code or ""), status=STATUS.get(code, "unknown"),
                         grade=GRADE.get(level)))
     return {"source_updated": None, "snow_depth_cm": None, "new_snow_cm": None, "lifts": lifts, "runs": runs}
+
+
+def parse_snow(html: str, options: dict) -> dict:
+    """Snow report (snow_url: cervinia.it/en/meteo): a table of snow depth per place; the
+    summit (Plateau Rosa) is the deepest reading."""
+    soup = BeautifulSoup(html, "html.parser")
+    depths = {}
+    for tr in soup.select("table tr"):
+        tds = [clean_text(td.get_text()) for td in tr.find_all("td")]
+        if len(tds) >= 2 and tds[1].lower().endswith("cm"):
+            depths[tds[0]] = to_number(tds[1])
+    place = options.get("snow_place", "Plateau Rosa")
+    return {"snow_depth_cm": depths.get(place) if depths.get(place) is not None else max(depths.values(), default=None)}

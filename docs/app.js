@@ -49,6 +49,7 @@ const state = {
   latestDates: {},    // id -> date of that resort's latest record (its local day)
   liveStatus: null,   // all groups' live files merged: {updated, results: {id: {..., date, changed}}}
   live: {},           // {id: {summit: {temp, time}, base: {temp, time}}}
+  forecast: {},       // {id: {summit: {min_c, max_c}, base: {...}, outlook, snow24}} today's, from Open-Meteo
   seasons: new Map(), // season label -> Promise of season file
 };
 
@@ -179,7 +180,9 @@ function loadSeason(label) {
             byDate.set(d.date, day);
           }
         }
-        return { season: label, days: [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)) };
+        const days = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+        addAreaRecords(days); // connected resorts (Niseko United): one combined record per day
+        return { season: label, days };
       });
     p.catch(() => state.seasons.delete(label));
     state.seasons.set(label, p);
@@ -187,8 +190,9 @@ function loadSeason(label) {
   return state.seasons.get(label);
 }
 
+/** Every single resort (not the areas of connected resorts; see areas.js). */
 function resortIds() {
-  return Object.keys(state.index.resorts);
+  return Object.keys(state.index.resorts).filter(id => !state.index.resorts[id].area);
 }
 
 function countryOf(id) {
@@ -203,10 +207,10 @@ function placeOf(id) {
 }
 
 /** Resorts grouped by country, then region, in the order of the data file:
- *  Map(country -> Map(region -> [ids])). */
-function countries() {
+ *  Map(country -> Map(region -> [ids])). The tables pass tableIds() (areas instead of their resorts). */
+function countries(ids = resortIds()) {
   const map = new Map();
-  for (const id of resortIds()) {
+  for (const id of ids) {
     const country = countryOf(id), region = state.index.resorts[id].region;
     if (!map.has(country)) map.set(country, new Map());
     const regionsOf = map.get(country);
@@ -239,6 +243,7 @@ function latestDateOf(id) {
 /** Latest lift/run status for a resort from its group's live file (if it's from the
  *  resort's latest day or newer). */
 function liveStatusFor(id) {
+  if (isArea(id)) return null;
   const e = state.liveStatus?.results?.[id];
   const latest = latestDateOf(id);
   if (!e || (latest && e.date && e.date < latest)) return null;
@@ -246,19 +251,82 @@ function liveStatusFor(id) {
 }
 
 /** The latest picture of a resort: lift and run status from live.json (every 45 min),
- *  snow and weather from the day's permanent record (once a day). */
+ *  snow and weather from the day's permanent record (once a day). Lifts that ran today but
+ *  are closed now because it's after hours count as open (see withAfterHours). An area
+ *  (connected resorts) combines its resorts' current pictures. */
 function currentResult(id) {
+  if (isArea(id)) return combineRecords(id, membersOf(id).map(m => [m, currentResult(m)]));
   const base = todayResult(id);
   const live = liveStatusFor(id);
   if (!live) return base;
-  return {
+  return withAfterHours(id, {
     ...(base || {}),
     ok: true,
     lifts: live.lifts, runs: live.runs, lifts_open: live.lifts_open, runs_open: live.runs_open,
     snow_depth_cm: base?.ok ? base.snow_depth_cm : null,
     new_snow_cm: base?.ok ? base.new_snow_cm : null,
     liveStatus: true,
+  }, live);
+}
+
+// ------------------------------------------------------------------ after hours
+
+function localDateIn(tz) {
+  return new Date().toLocaleDateString("en-CA", { timeZone: tz });
+}
+function localTimeIn(tz) {
+  return new Date().toLocaleTimeString("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+}
+/** "08:30-16:00" -> "16:00" */
+function closingTime(hours) {
+  return /-(\d{2}:\d{2})$/.exec(hours || "")?.[1] || null;
+}
+
+/** Resorts mark lifts (and runs) closed once they shut for the day. A lift that was open at
+ *  some check today (live file: open_today) and is closed now, after its closing time, is
+ *  shown as open with a "closed after hours" note. Lifts without published hours use the
+ *  resort's: after the last closing time of its other lifts, or once nothing is running after
+ *  the first closing time (15:00 if no hours are published). Runs follow the resort. A closure
+ *  during the day (e.g. wind) stays closed. */
+function withAfterHours(id, r, live) {
+  const ot = live?.open_today;
+  if (!ot || !r?.ok) return r;
+  const tz = tzOf(id);
+  const pastDay = !!live.date && live.date < localDateIn(tz);
+  const now = localTimeIn(tz);
+  const ends = r.lifts.map(l => closingTime(l.hours)).filter(Boolean).sort();
+  const firstEnd = ends[0] || "15:00", lastEnd = ends[ends.length - 1] || "15:00";
+  const anyOpen = r.lifts.some(l => l.status === "open");
+  const resortDone = pastDay || now >= lastEnd || (!anyOpen && now >= firstEnd);
+  const liftsOpened = new Set(ot.lifts || []), runsOpened = new Set(ot.runs || []);
+  let n = 0;
+  const lifts = r.lifts.map(l => {
+    if (l.status !== "closed" || !liftsOpened.has(l.name)) return l;
+    const end = closingTime(l.hours);
+    if (!(pastDay || (end ? now >= end : resortDone))) return l;
+    n += 1;
+    return { ...l, status: "open", afterHours: true };
+  });
+  const runs = (r.runs || []).map(x => x.status === "closed" && runsOpened.has(x.name) && resortDone
+    ? { ...x, status: "open", afterHours: true } : x);
+  if (!n && !runs.some(x => x.afterHours)) return r;
+  return {
+    ...r, lifts, runs, afterHours: n,
+    lifts_open: lifts.filter(l => l.status === "open").length,
+    runs_open: runs.length ? runs.filter(x => x.status === "open" || x.status === "partial").length : r.runs_open,
   };
+}
+
+/** Small note under a lift count when some of the open lifts have closed for the day. */
+function afterHoursNote(r) {
+  if (!r?.afterHours) return "";
+  const all = r.afterHours >= r.lifts_open;
+  return `<span class="cell-note after-hours-note" title="These lifts ran today and have closed for the day">${
+    all ? "open today · now after hours" : `${r.afterHours} now after hours`}</span>`;
+}
+
+function afterHoursTag(x) {
+  return x.afterHours ? ` <span class="after-hours" title="It ran today; the resort now lists it as closed for the day">closed after hours</span>` : "";
 }
 
 function scheduleText() {
@@ -284,7 +352,7 @@ function statusTimeHtml(id = null) {
   return `Lift &amp; run status: last change <strong>${esc(time)}</strong> your time (each resort is checked every 45 min, ${scheduleText()} its local time)`;
 }
 
-function seasonSummary(id) {
+function seasonSummary(id) {  // areas: combined in injectAreas()
   const latest = latestDateOf(id);
   return latest ? state.index.seasons[seasonOf(latest)]?.summary?.[id] || {} : {};
 }
@@ -304,21 +372,53 @@ async function fetchLive() {
     longitude: points.map(p => p.info.location.lon).join(","),
     elevation: points.map(p => p.info.elevation_m[p.level]).join(","),
     current: "temperature_2m,snowfall,weather_code",
-    timezone: "GMT", // times in UTC (resorts are in many time zones)
+    // today's forecast and the snow outlook (the scraper stores them in the daily record once a
+    // day; this covers resorts whose record isn't written yet), plus the last 24 hours of snowfall
+    daily: "temperature_2m_min,temperature_2m_max,snowfall_sum",
+    hourly: "snowfall",
+    past_hours: 24,
+    forecast_hours: 1,
+    forecast_days: 16,
+    timezone: "auto", // each resort's own day; current.time is local (converted to UTC below)
   });
   try {
     const resp = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     let data = await resp.json();
     if (!Array.isArray(data)) data = [data];
-    const live = {};
+    const live = {}, forecast = {};
     points.forEach((p, i) => {
-      const cur = data[i]?.current;
+      const e = data[i];
+      const cur = e?.current;
+      // local time "2026-11-28T15:15" -> UTC, using the location's offset
+      const utc = cur?.time ? new Date(Date.parse(`${cur.time}:00Z`) - (e.utc_offset_seconds || 0) * 1000).toISOString().slice(0, 16) : null;
       if (cur && cur.temperature_2m !== null && cur.temperature_2m !== undefined) {
-        (live[p.id] ||= {})[p.level] = { temp: cur.temperature_2m + 0, snowfall: cur.snowfall ?? 0, code: cur.weather_code, time: cur.time };
+        (live[p.id] ||= {})[p.level] = { temp: cur.temperature_2m + 0, snowfall: cur.snowfall ?? 0, code: cur.weather_code, time: utc };
+      }
+      const daily = e?.daily;
+      if (daily?.time?.length) {
+        const f = (forecast[p.id] ||= {});
+        if (daily.temperature_2m_min[0] != null) f[p.level] = { min_c: daily.temperature_2m_min[0] + 0, max_c: daily.temperature_2m_max[0] + 0 };
+        if (p.level === "summit") {
+          const k = daily.snowfall_sum.findIndex(v => v != null && v >= 1);
+          f.outlook = k >= 0 ? { date: daily.time[k], days: k, cm: Math.round(daily.snowfall_sum[k] * 10) / 10 }
+            : { date: null, days: null, within_days: daily.time.length };
+          const past = (e.hourly?.snowfall || []).slice(0, 24).filter(v => v != null);
+          if (past.length) f.snow24 = Math.round(past.reduce((a, b) => a + b, 0) * 10) / 10;
+        }
       }
     });
+    for (const aid of areaIds()) {
+      const ms = membersOf(aid);
+      live[aid] = combineLevels(ms.map(m => live[m]));
+      const fs = ms.map(m => forecast[m]).filter(Boolean);
+      if (fs.length) {
+        forecast[aid] = { ...combineLevels(fs), outlook: fs.map(f => f.outlook).filter(o => o?.date).sort((a, b) => a.date.localeCompare(b.date))[0] || fs[0].outlook,
+          snow24: avgOf(fs.map(f => f.snow24)) };
+      }
+    }
     state.live = live;
+    state.forecast = forecast;
   } catch (err) {
     console.warn("Live temperatures unavailable:", err.message); // fall back to the forecast range
   }
@@ -358,6 +458,8 @@ function baseTempHtml(id) {
     const note = t.kind === "forecast" ? "forecast low / high" : "low / high";
     return `${deg(t.base.min_c)} / ${deg(t.base.max_c)} °C<span class="cell-note">${note}</span>`;
   }
+  const f = state.forecast[id]?.base;
+  if (f) return `${deg(f.min_c)} / ${deg(f.max_c)} °C<span class="cell-note">forecast low / high</span>`;
   return NA;
 }
 
@@ -425,6 +527,7 @@ const STALE_WARNING_HOURS = 48; // warn on the site only after 2 days of failed 
  *  of the first failed check in a row (live.json's failing_since), otherwise null. Shorter
  *  outages show nothing (the last status we got is usually still close enough). */
 function failingSince(id) {
+  if (isArea(id)) return membersOf(id).map(failingSince).filter(Boolean).sort()[0] || null;
   const since = state.liveStatus?.results?.[id]?.failing_since;
   return since && Date.now() - new Date(since).getTime() >= STALE_WARNING_HOURS * 3600e3 ? since : null;
 }
@@ -455,7 +558,7 @@ function liftsHtml(id, result) {
   if (!result) return NA;
   if (!result.ok) return `<span class="warn">Couldn't read page</span>`;
   const total = seasonSummary(id).lifts_total ?? result.lifts.length;
-  return `<strong>${result.lifts_open}</strong> / ${total}`;
+  return `<strong>${result.lifts_open}</strong> / ${total}${afterHoursNote(result)}`;
 }
 
 const HISTORY_ICON = `<svg class="history-icon" viewBox="0 0 24 24" width="14" height="14" role="img" aria-label="Recently viewed">
@@ -525,14 +628,14 @@ function suggestions(query) {
   const byName = (a, b) => state.index.resorts[a].name.localeCompare(state.index.resorts[b].name);
   if (!normalize(query)) {
     // Nothing typed: recently viewed first, then fill up alphabetically.
-    const rest = resortIds().filter(id => !recentIds.includes(id)).sort(byName);
+    const rest = searchIds().filter(id => !recentIds.includes(id)).sort(byName);
     return [...recentIds, ...rest].slice(0, MAX_SUGGESTIONS);
   }
   const rank = id => (recentIds.includes(id) ? recentIds.indexOf(id) : Infinity);
-  return resortIds()
+  return searchIds()
     .map(id => ({ id, score: matchScore(id, query) }))
     .filter(x => x.score >= 0)
-    .sort((a, b) => (rank(a.id) - rank(b.id)) || (b.score - a.score) || byName(a.id, b.id))
+    .sort((a, b) => (rank(a.id) - rank(b.id)) || (b.score - a.score) || (isArea(b.id) - isArea(a.id)) || byName(a.id, b.id))
     .slice(0, MAX_SUGGESTIONS)
     .map(x => x.id);
 }
@@ -763,7 +866,7 @@ function liftsBox(id, r, more = "") {
   const p = pct(r.lifts_open, total);
   return box("lifts", "Lifts open",
     `<div class="box-value">${r.lifts_open} <small>/ ${total}</small></div>
-     <div class="box-note">${Math.round(p)}% open</div>${more ? `<div class="box-note box-more">${more}</div>` : ""}`, p, "fill-green");
+     <div class="box-note">${Math.round(p)}% open${r.afterHours ? ` · ${r.afterHours} now closed after hours` : ""}</div>${more ? `<div class="box-note box-more">${more}</div>` : ""}`, p, "fill-green");
 }
 
 function runsBox(id, r, more = "") {
@@ -820,7 +923,9 @@ function outlookText(o) {
 }
 
 function newSnowBox(id, r, date, isLatest) {
-  const value = r?.ok ? r.new_snow_cm : null;
+  let value = r?.ok ? r.new_snow_cm : null;
+  // The resort doesn't report new snow: today, Open-Meteo's snowfall over the last 24 hours.
+  const model = isLatest && value == null ? state.forecast[id]?.snow24 ?? null : null;
   const t = r?.temps;
   let snowing = false, wxNote = "";
   if (isLatest) {
@@ -833,7 +938,7 @@ function newSnowBox(id, r, date, isLatest) {
     snowing = !!t.snowed;
     wxNote = `Snowed ${t.snow_hours} hour${t.snow_hours === 1 ? "" : "s"} at the summit that day`;
   }
-  const outlook = isLatest && (value === 0 || value == null) ? outlookText(r?.snow_outlook) : "";
+  const outlook = isLatest && (value === 0 || value == null) ? outlookText(r?.snow_outlook || state.forecast[id]?.outlook) : "";
   const s = state.index.seasons[seasonOf(date)]?.summary?.[id] || {};
   let graphic = "";
   if (value != null) {
@@ -845,7 +950,8 @@ function newSnowBox(id, r, date, isLatest) {
   }
   return box("snow", "New snow",
     `${weatherIcon(snowing)}
-     <div class="box-value">${num(value, " cm")}</div>
+     <div class="box-value">${model != null ? `~${model} <small>cm</small>` : num(value, " cm")}</div>
+     ${model != null ? `<div class="box-note">Weather model: snowfall at the summit in the last 24 hours (the resort doesn't report new snow)</div>` : ""}
      ${outlook ? `<div class="box-note box-outlook">${esc(outlook)}</div>` : ""}
      ${wxNote ? `<div class="box-note">${esc(wxNote)}</div>` : ""}
      ${graphic}`, null, "box-snow");
@@ -853,11 +959,12 @@ function newSnowBox(id, r, date, isLatest) {
 
 function tempBox(id, level, r, date, isLatest) {
   const info = state.index.resorts[id];
-  const t = r?.temps?.[level];
-  const elevation = t?.elevation_m ?? info.elevation_m?.[level];
-  const title = `${level === "summit" ? "Summit" : "Base"} at ${elevation ? `${Number(elevation).toLocaleString("en-GB")} m` : NA}`;
+  // Today without a daily record yet (or its weather missing): the browser's own forecast.
+  const t = r?.temps?.[level] || (isLatest ? state.forecast[id]?.[level] : null);
+  const elevation = t?.elevation_m ?? info.elevation_m?.[level] ?? avgOf((info.members || []).map(m => state.index.resorts[m].elevation_m?.[level]), 0);
+  const title = `${level === "summit" ? "Summit" : "Base"} at ${elevation ? `${Number(elevation).toLocaleString("en-GB")} m` : NA}${info.area ? " (average)" : ""}`;
   if (!t) return box(level, title, `<div class="box-value">${NA}</div>`);
-  const kind = r.temps.kind === "forecast" ? "forecast min / max" : "min / max";
+  const kind = (r?.temps?.[level] ? r.temps.kind : "forecast") === "forecast" ? "forecast min / max" : "min / max";
   let below = "";
   if (isLatest) {
     const live = state.live[id]?.[level];
@@ -947,7 +1054,7 @@ function liftsTable(lifts, startOpen = false, ns = null) {
         <tbody>${lifts.map(l => `
           <tr>
             <td>${esc(l.name_en)}${isNightLift(ns, l) ? nightIcon(ns, "Night skiing lift") : ""}${l.name !== l.name_en ? `<span class="cell-note"${JAPANESE_RE.test(l.name) ? ' lang="ja"' : ""}>${esc(l.name)}</span>` : ""}</td>
-            <td><span class="badge s-${esc(l.status)}" title="Resort's wording: ${esc(l.raw)}">${esc(STATUS_LABEL[l.status])}</span></td>
+            <td><span class="badge s-${esc(l.status)}" title="Resort's wording: ${esc(l.raw)}">${esc(STATUS_LABEL[l.status])}</span>${afterHoursTag(l)}</td>
             <td class="num">${esc(l.hours)}</td>
             <td>${typeIcon(l.lift_type)}</td>
           </tr>`).join("")}</tbody>
@@ -968,7 +1075,7 @@ function runsTable(runs, startOpen = false, liftsOpen = null) {
         <tbody>${runs.map(x => `
           <tr>
             <td>${esc(x.name_en)}${x.name !== x.name_en ? `<span class="cell-note"${JAPANESE_RE.test(x.name) ? ' lang="ja"' : ""}>${esc(x.name)}</span>` : ""}</td>
-            <td><span class="badge s-${esc(x.status)}" title="Resort's wording: ${esc(x.raw)}">${esc(RUN_STATUS_LABEL[x.status])}</span></td>
+            <td><span class="badge s-${esc(x.status)}" title="Resort's wording: ${esc(x.raw)}">${esc(RUN_STATUS_LABEL[x.status])}</span>${afterHoursTag(x)}</td>
             <td>${difficultyHtml(x.level)}</td>
           </tr>`).join("")}</tbody>
       </table>
@@ -1028,10 +1135,13 @@ async function renderResortPage(id, date) {
         <h1 class="page-title">${esc(info.name)}${nightIcon(nightSkiing(id, date))}</h1>
         <p class="resort-links small">
           ${info.website ? `<a href="${esc(info.website)}" target="_blank" rel="noopener">Official website ↗</a> · ` : ""}
-          <a href="${esc(info.source_url)}" target="_blank" rel="noopener">Lift status page ↗</a> · ${esc(placeOf(id))}
+          <a href="${esc(info.source_url)}" target="_blank" rel="noopener">Lift status page ↗</a> · ${esc(placeOf(id))}${
+            areaOfResort(id) ? ` · part of <a href="#/resort/${esc(areaOfResort(id))}">${esc(state.index.resorts[areaOfResort(id)].name)}</a>` : ""}
         </p>
+        ${info.area ? `<p class="muted small">${membersOf(id).length} connected resorts: lifts and runs are totals; snow and temperatures are averages.</p>` : ""}
       </div>
       <div class="head-buttons">
+        ${info.area ? `<button type="button" class="button" data-compare-area title="Open Compare's graph with every resort of ${esc(info.name)}">Compare all ${membersOf(id).length}</button>` : ""}
         <a class="button button-secondary" href="#/history/${esc(id)}">Switch to historical</a>
         <button class="pin pin-large${pins.has(id) ? " is-pinned" : ""}" type="button" data-pin="${esc(id)}"
           aria-pressed="${pins.has(id)}">${pinIcon(pins.has(id))}<span>${pins.has(id) ? "Pinned" : "Pin"}</span></button>
@@ -1046,12 +1156,17 @@ async function renderResortPage(id, date) {
     ${!r ? `<p class="warn">No data for this day.</p>` : !r.ok && !(isLatest && failingSince(id)) ? `<p class="warn">Couldn't read the resort's page this day.</p>` : ""}
     <div class="boxes">${boxesHtml(id, r, date, isLatest)}</div>
 
+    ${info.area ? areaMembersHtml(id, m => {
+      const mr = isLatest ? currentResult(m) : day?.results?.[m];
+      return mr?.ok ? `Lifts ${liftsHtml(m, mr)} · Runs ${runsHtml(mr)}` : mr ? `<span class="warn">Couldn't read page</span>` : NA;
+    }, m => isLatest ? `#/resort/${m}` : `#/resort/${m}/${date}`) : ""}
     ${r?.ok ? liftsTable(r.lifts, false, nightSkiing(id, date)) + runsTable(r.runs || [], false, r.lifts_open) : ""}
     ${mapHtml(info)}`;
 
   view.querySelector("button[data-pin]").addEventListener("click", () => {
     if (pins.toggle(id)) renderResortPage(id, isLatest ? null : date);
   });
+  if (info.area) setupAreaButtons(id, isLatest ? null : { unit: "season", value: seasonOf(date) });
   linkBoxesToLists();
 }
 
@@ -1136,6 +1251,7 @@ async function start() {
     const resp = await fetch("data/lifts.json", { cache: "no-cache" });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     state.index = await resp.json();
+    injectAreas(); // connected resorts (areas.js)
     showCompareBadge(); // resorts added to Compare since it was last opened
     const labels = Object.keys(state.index.seasons || {}).sort();
     const label = labels[labels.length - 1];

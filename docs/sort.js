@@ -147,18 +147,19 @@ function countryFilter() {
 /** Resorts in the chosen countries (all when none is chosen), in the usual order. */
 function shownIds() {
   const chosen = countryFilter();
-  return chosen.length ? resortIds().filter(id => chosen.includes(countryOf(id))) : resortIds();
+  const ids = tableIds(); // connected resorts appear once, as their area
+  return chosen.length ? ids.filter(id => chosen.includes(countryOf(id))) : ids;
 }
 
 /** "All · Japan · Italy · ..." toggle buttons; several countries can be on at once. */
 function countryFilterHtml() {
-  const all = [...countries().keys()];
+  const all = [...countries(tableIds()).keys()];
   if (all.length < 2) return "";
   const chosen = countryFilter();
   const btn = (value, label, on, count) => `
     <button type="button" class="chip${on ? " is-on" : ""}" aria-pressed="${on}" data-country-filter="${esc(value)}">${esc(label)}${
       count != null ? ` <span class="chip-count">${count}</span>` : ""}</button>`;
-  const sizes = countries();
+  const sizes = countries(tableIds());
   return `
     <div class="country-filter" role="group" aria-label="Show countries">
       ${btn("", "All countries", !chosen.length, null)}
@@ -196,7 +197,7 @@ function resortGroupsHtml(rowFn, valueOf, hist) {
       </section>`;
   }
   if (s.key === "default" || s.regions) {
-    for (const [country, regionsOf] of countries()) {
+    for (const [country, regionsOf] of countries(tableIds())) {
       if (chosen.length && !chosen.includes(country)) continue;
       const ids = [...regionsOf.values()].flat();
       // Default order: region headings (when the country has more than one region).

@@ -47,7 +47,7 @@ def cm_from_inches(v) -> int | None:
 RETRY_WAITS = (5, 15)  # seconds to wait before the 2nd and 3rd try
 
 
-def _get_with_retries(url: str, headers: dict) -> requests.Response:
+def _get_with_retries(url: str, headers: dict, data: str | None = None) -> requests.Response:
     """GET, retrying a couple of times when the site refuses the connection, times out or
     has a server error (5xx). Sites sometimes hiccup, especially towards cloud servers like
     GitHub's. Other errors (e.g. 404 page not found) aren't retried: they won't fix themselves."""
@@ -56,7 +56,11 @@ def _get_with_retries(url: str, headers: dict) -> requests.Response:
             print(f"  retrying in {wait}s ({type(last_error).__name__})")
             time.sleep(wait)
         try:
-            resp = requests.get(url, headers=headers, timeout=TIMEOUT_SECONDS)
+            if data is None:
+                resp = requests.get(url, headers=headers, timeout=TIMEOUT_SECONDS)
+            else:  # a form POST (e.g. Livigno's snow widget)
+                resp = requests.post(url, data=data, timeout=TIMEOUT_SECONDS,
+                                     headers={**headers, "Content-Type": "application/x-www-form-urlencoded"})
             if resp.status_code >= 500:
                 resp.raise_for_status()
             return resp
@@ -67,14 +71,15 @@ def _get_with_retries(url: str, headers: dict) -> requests.Response:
     raise last_error
 
 
-def fetch(url: str, method: str = "html", referer: str | None = None) -> str:
-    """Return the page text. method="browser" runs JavaScript via Playwright."""
+def fetch(url: str, method: str = "html", referer: str | None = None, data: str | None = None) -> str:
+    """Return the page text. method="browser" runs JavaScript via Playwright. `data`: send a
+    form POST with this body instead of a GET (plain download only)."""
     if method == "browser":
         return _fetch_with_browser(url)
     headers = {"User-Agent": USER_AGENT}
     if referer:
         headers["Referer"] = referer
-    resp = _get_with_retries(url, headers)
+    resp = _get_with_retries(url, headers, data)
     resp.raise_for_status()
     # Servers that don't declare a charset default to ISO-8859-1, which garbles Japanese.
     if not resp.encoding or resp.encoding.lower() == "iso-8859-1":

@@ -68,3 +68,18 @@ def parse(html: str, options: dict) -> dict:
         grade = next((GRADE[c] for c in (level.get("class") if level else []) if c in GRADE), None)
         runs.append(run(_name(li), raw, status=_status(raw), grade=grade))
     return {"source_updated": None, "snow_depth_cm": None, "new_snow_cm": None, "lifts": lifts, "runs": runs}
+
+
+def parse_snow(html: str, options: dict) -> dict:
+    """Snow report (snow_url: zellamsee-kaprun.com/en/service/live/snow-report): one tab per
+    place ("Kitzsteinhorn at 3000 m  +0 cm  60 cm": forecast new snow, then snow depth).
+    The summit reading is the Kitzsteinhorn's."""
+    soup = BeautifulSoup(html, "html.parser")
+    place = options.get("snow_place", "Kitzsteinhorn")
+    for tab in soup.select(".weather--days-nav--day"):
+        text = clean_text(tab.get_text(" "))
+        if text.startswith(place):
+            m = re.search(r"\+\s*\d+\s*cm\s+(\d+)\s*cm", text)
+            if m:
+                return {"snow_depth_cm": int(m.group(1))}
+    return {}

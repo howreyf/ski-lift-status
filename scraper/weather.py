@@ -29,6 +29,7 @@ from the visitor's browser; nothing live is stored.
 
 from __future__ import annotations
 
+import time
 from datetime import date as Date
 
 import requests
@@ -39,7 +40,7 @@ FORECAST_DAYS = 16          # longest snow outlook Open-Meteo offers
 LEVELS = ("summit", "base")
 SNOW_DAY_CM = 1.0           # a "snow day" in the outlook: at least this much at the summit
 SNOWED_HOURS = 3            # a past day counts as "snowed" with at least this many hours of snow
-TIMEOUT_SECONDS = 30
+TIMEOUT_SECONDS = 60
 
 
 def has_location(resort: dict) -> bool:
@@ -64,9 +65,17 @@ def fetch_weather(resorts: list[dict]) -> dict[str, dict[str, dict]]:
         "past_days": PAST_DAYS,
         "forecast_days": FORECAST_DAYS,
     }
-    resp = requests.get(API_URL, params=params, timeout=TIMEOUT_SECONDS)
-    resp.raise_for_status()
-    return parse_response(resp.json(), points)
+    # Open-Meteo is sometimes slow (a big request: every resort, 23 days): try up to 3 times.
+    for attempt in range(3):
+        try:
+            resp = requests.get(API_URL, params=params, timeout=TIMEOUT_SECONDS)
+            resp.raise_for_status()
+            return parse_response(resp.json(), points)
+        except (requests.Timeout, requests.ConnectionError) as e:
+            if attempt == 2:
+                raise
+            print(f"  Open-Meteo: {type(e).__name__}, trying again in {10 * (attempt + 1)}s")
+            time.sleep(10 * (attempt + 1))
 
 
 def _num(v):
