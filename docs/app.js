@@ -971,6 +971,7 @@ function route(scrollTop = true) {
   const path = location.hash.replace(/^#\/?/, "");
   const [page, id, date, value] = path.split("/");
   const tab = page === "resorts" || page === "resort" ? "resorts" : page === "history" ? "history" : page === "compare" ? "compare" : "home";
+  document.body.classList.toggle("is-home", tab === "home"); // mountain drawing behind the Home page
   document.querySelectorAll(".tabs a").forEach(a => {
     if (a.dataset.tab === tab) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");

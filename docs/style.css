@@ -199,22 +199,21 @@ details[open] > summary.group-title::before { transform: rotate(45deg); }
 
 /* ---------------------------------------------------------------- resorts directory */
 
-/* Home: title over contour lines */
-.hero {
-  position: relative; overflow: hidden; isolation: isolate;
-  margin: 8px 0 28px; padding: 88px 20px 80px; text-align: center;
-  background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+/* Home: a 3D contour drawing of a mountain range behind the whole page */
+body.is-home {
+  /* drawn at least 1100px wide; placed so the summit (about 25% down the drawing) sits just
+     below the Find resorts button, and the range runs down the rest of the page */
+  --bgw: max(100vw, 1100px);
+  background-image: url(contours-light.svg);
+  background-repeat: no-repeat;
+  background-size: var(--bgw) auto;
+  background-position: center calc(270px + 9vh - var(--bgw) * 0.159);
 }
-.hero::before { /* the contour drawing, coloured by the theme */
-  content: ""; position: absolute; inset: 0; z-index: -2;
-  background: var(--accent); opacity: .28;
-  -webkit-mask: url(contours.svg) center / cover no-repeat; mask: url(contours.svg) center / cover no-repeat;
+@media (prefers-color-scheme: dark) {
+  body.is-home { background-image: url(contours-dark.svg); }
 }
-.hero::after { /* fades the lines behind the title so it stays easy to read */
-  content: ""; position: absolute; inset: 0; z-index: -1;
-  background: radial-gradient(ellipse 42% 46% at 50% 50%, var(--card) 30%, transparent 100%);
-  opacity: .85;
-}
+.hero { margin: 0 0 12px; padding: 9vh 20px max(24vh, 170px); text-align: center; }
+.hero-title { text-shadow: 0 0 24px var(--bg), 0 0 8px var(--bg); }
 .hero-title { margin: 0 0 30px; font-size: clamp(48px, 10vw, 92px); font-weight: 800; line-height: 1; letter-spacing: -.035em; }
 .hero-button { padding: 12px 26px; font-size: 16px; border-radius: 999px; text-decoration: none; }
 

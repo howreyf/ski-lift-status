@@ -36,7 +36,7 @@ Plain HTML/CSS/JavaScript, no build step. Pages (the part after `#` in the addre
 
 | Page | Address | What's on it |
 |---|---|---|
-| Home | `#/` | Large "Ski Status" title over contour lines (`docs/contours.svg`, used as a mask so it takes the theme colour), a "Find resorts" button, and the pinned resorts (up to 5) or, with none pinned, a prompt that leads to Resorts |
+| Home | `#/` | Large "Ski Status" title and a "Find resorts" button, over a 3D contour drawing of a mountain range that runs behind the whole page (`docs/contours-light.svg` / `contours-dark.svg`: stacked contour layers seen from the front, higher layers hiding the ones behind), and the pinned resorts (up to 5) or, with none pinned, a prompt that leads to Resorts |
 | Resorts | `#/resorts` | "Find resort" search, pinned resorts, resort table grouped by region (collapsible) |
 | One resort | `#/resort/<id>` | Boxes (lifts, runs, snow depth, new snow, base and summit temperature), lifts and runs lists, trail map |
 | One resort, past day | `#/resort/<id>/<YYYY-MM-DD>` | The same for a historical record (final temperatures, day's mean vs season) |
