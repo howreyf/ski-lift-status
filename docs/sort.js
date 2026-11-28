@@ -176,6 +176,41 @@ function setupCountryFilter(root, redraw) {
   }));
 }
 
+// ------------------------------------------------------------------ connected resorts (areas)
+
+// Areas whose list of resorts is open (closed by default; kept while the visitor stays on the page).
+const openAreas = new Set();
+
+const CHEVRON = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+/** An area's row with an arrow that shows / hides a row for each of its resorts. */
+function areaRowHtml(aid, rowFn) {
+  const open = openAreas.has(aid);
+  const name = state.index.resorts[aid].name;
+  return `
+    <div class="area-group${open ? " is-open" : ""}" data-area="${esc(aid)}">
+      <div class="area-head">
+        <button type="button" class="area-toggle" data-area-toggle="${esc(aid)}" aria-expanded="${open}"
+          aria-controls="area-sub-${esc(aid)}" title="Show the resorts of ${esc(name)}"
+          aria-label="Show the ${membersOf(aid).length} resorts of ${esc(name)}">${CHEVRON}</button>
+        ${rowFn(aid)}
+      </div>
+      <div class="area-sub" id="area-sub-${esc(aid)}"${open ? "" : " hidden"}>${membersOf(aid).map(rowFn).join("")}</div>
+    </div>`;
+}
+
+function setupAreaToggles(root) {
+  root.querySelectorAll("[data-area-toggle]").forEach(b => b.addEventListener("click", () => {
+    const aid = b.dataset.areaToggle;
+    const group = b.closest(".area-group");
+    const open = !openAreas.has(aid);
+    open ? openAreas.add(aid) : openAreas.delete(aid);
+    group.classList.toggle("is-open", open);
+    group.querySelector(".area-sub").hidden = !open;
+    b.setAttribute("aria-expanded", String(open));
+  }));
+}
+
 // ------------------------------------------------------------------ table groups
 
 /** Pinned group, then either the country dropdowns (regions as headings inside; sorted
@@ -184,6 +219,7 @@ function setupCountryFilter(root, redraw) {
 function resortGroupsHtml(rowFn, valueOf, hist) {
   const s = sortState();
   const order = ids => orderIds(ids, valueOf, s);
+  const row = id => (isArea(id) ? areaRowHtml(id, rowFn) : rowFn(id));
   activeSort = s.key === "default" ? null : { s, valueOf, hist };
   const pinned = pins.list();
   const closed = closedCountries();
@@ -193,7 +229,7 @@ function resortGroupsHtml(rowFn, valueOf, hist) {
     html += `
       <section class="group group-pinned">
         <h2 class="group-title">${pinIcon(true)} Pinned <span class="count">${pinned.length} / ${MAX_PINS}</span></h2>
-        ${order(pinned).map(rowFn).join("")}
+        ${order(pinned).map(row).join("")}
       </section>`;
   }
   if (s.key === "default" || s.regions) {
@@ -202,9 +238,9 @@ function resortGroupsHtml(rowFn, valueOf, hist) {
       const ids = [...regionsOf.values()].flat();
       // Default order: region headings (when the country has more than one region).
       // Sorted: one list inside the country (the region is shown under each name).
-      const body = s.key !== "default" ? order(ids).map(rowFn).join("")
+      const body = s.key !== "default" ? order(ids).map(row).join("")
         : [...regionsOf].map(([region, rIds]) => `${regionsOf.size > 1 ? `<h3 class="region-title">${esc(region)}</h3>` : ""}${
-            rIds.map(rowFn).join("")}`).join("");
+            rIds.map(row).join("")}`).join("");
       html += `
         <details class="group country${s.key === "default" && regionsOf.size > 1 ? " by-region" : ""}" data-country="${esc(country)}"${closed.includes(country) ? "" : " open"}>
           <summary class="group-title">${esc(country)} <span class="count">${ids.length}</span></summary>
@@ -216,7 +252,7 @@ function resortGroupsHtml(rowFn, valueOf, hist) {
       <section class="group group-sorted">
         <h2 class="group-title">${SORT_ICON} ${esc(sortLabel(s, hist))}
           <span class="count">${s.key === "night" ? (s.desc ? "night skiing first" : "night skiing last") : s.desc ? "high to low" : "low to high"}</span></h2>
-        ${order(shownIds()).map(rowFn).join("")}
+        ${order(shownIds()).map(row).join("")}
       </section>`;
   }
   activeSort = null;
@@ -300,6 +336,7 @@ function setupSort(root, redraw) {
   }));
   pop.querySelector("[data-sort-regions]").addEventListener("change", e => { s.regions = e.target.checked; change(); });
   setupCountryFilter(root, () => { sortPanelOpen = false; redraw(); });
+  setupAreaToggles(root);
 
   if (sortPanelOpen) open();
 }

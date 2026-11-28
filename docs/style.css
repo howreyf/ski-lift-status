@@ -712,3 +712,24 @@ footer { margin: 28px auto 32px; line-height: 1.6; }
 /* lifts/runs that ran today and have now closed for the day */
 .after-hours { display: inline-block; margin-left: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
 .after-hours-note { color: var(--muted); }
+
+/* connected resorts in the tables: an arrow on the area's row opens a row per resort */
+.area-group { border-top: 1px solid var(--line); }
+.area-head { position: relative; }
+.area-head > .resort-row { border-top: 0; }
+.group-title + .area-group, .region-title + .area-group { border-top: 0; }
+.area-head .cell-name { padding-left: 26px; }
+.area-toggle {
+  position: absolute; left: 8px; top: 50%; transform: translateY(-50%); z-index: 1;
+  display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0;
+  border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer;
+}
+.area-toggle:hover { color: var(--accent); background: var(--accent-soft); }
+.area-toggle:focus-visible { outline: 2px solid var(--accent); }
+.area-toggle svg { transition: transform .15s ease; }
+.area-group.is-open .area-toggle svg { transform: rotate(90deg); }
+.area-sub { background: color-mix(in srgb, var(--accent-soft) 45%, transparent); }
+.area-sub .cell-name { padding-left: 40px; font-weight: 500; }
+.area-sub .cell-name .cell-note { display: none; } /* same region as the area */
+@media (prefers-reduced-motion: reduce) { .area-toggle svg { transition: none; } }
+@media (max-width: 680px) { .area-toggle { top: 12px; transform: none; } }
